@@ -83,8 +83,8 @@ if not st.session_state.consent_given:
             st.session_state.consent_given = True
             
             # Show success toast
-            st.toast(f"Дякуємо! Ваш анонімний ID: {generated_id}", icon="✅")
-            time.sleep(1)
+            st.toast(f"Згенеровано анонімний ID: {generated_id}")
+            time.sleep(2)
             st.rerun()
 
 # ========== MAIN APP (AFTER CONSENT) ==========
@@ -190,7 +190,7 @@ else:
             
             with col1:
                 # Back button to return to Factor 5
-                if st.button("⬅️ Назад", use_container_width=True):
+                if st.button("Назад", use_container_width=True):
                     st.session_state.evaluation_complete = False
                     st.session_state.current_step = 5
                     st.rerun()
@@ -313,7 +313,7 @@ else:
             # Navigation for Step 0 - Full width button
             if st.button("Далі", key="next_btn_step0", type="primary", use_container_width=True):
                 if not st.session_state.form_data["s_id"]:
-                    st.toast("Будь ласка, вкажіть ID учня", icon="⚠️")
+                    st.toast("Вкажіть ID учня")
                 else:
                     # Lock student data after leaving Step 0
                     lock_student_data()
