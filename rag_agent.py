@@ -69,17 +69,46 @@ class ResilienceAgent:
             "Здоров'я": submission.health_score,
         }
         
+        # Process individual question comments
+        comments_summary = []
+        if submission.family_support_comments:
+            non_empty = [c for c in submission.family_support_comments if c.strip()]
+            if non_empty:
+                comments_summary.append(f"Підтримка сім'ї: {'; '.join(non_empty)}")
+        
+        if submission.optimism_comments:
+            non_empty = [c for c in submission.optimism_comments if c.strip()]
+            if non_empty:
+                comments_summary.append(f"Оптимізм: {'; '.join(non_empty)}")
+        
+        if submission.coping_comments:
+            non_empty = [c for c in submission.coping_comments if c.strip()]
+            if non_empty:
+                comments_summary.append(f"Цілеспрямованість: {'; '.join(non_empty)}")
+        
+        if submission.social_connections_comments:
+            non_empty = [c for c in submission.social_connections_comments if c.strip()]
+            if non_empty:
+                comments_summary.append(f"Соціальні зв'язки: {'; '.join(non_empty)}")
+        
+        if submission.health_comments:
+            non_empty = [c for c in submission.health_comments if c.strip()]
+            if non_empty:
+                comments_summary.append(f"Здоров'я: {'; '.join(non_empty)}")
+        
         retrieved_knowledge = self._retrieve_knowledge(scores)
         
         user_prompt = f"""
         Оцінки учня (0=низький, 1=середній, 2=високий):
         {scores}
 
-        Коментар вчителя: {submission.teacher_comment or 'не вказано'}
+        Конкретні спостереження вчителя по кожному питанню:
+        {chr(10).join(comments_summary) if comments_summary else 'не вказано'}
 
         НАУКОВІ ДАНІ З БАЗИ ЗНАНЬ (ВИКОРИСТОВУЙ ТІЛЬКИ ЦЕ):
         {retrieved_knowledge}
 
+        ВАЖЛИВО: Корелюй кожен бал з конкретними коментарями вчителя для більш нюансованого аналізу.
         Напиши коротку інструкцію для вчителя маркованими списками.
         """
         

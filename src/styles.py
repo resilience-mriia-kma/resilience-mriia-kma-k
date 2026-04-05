@@ -57,12 +57,21 @@ def apply_custom_styles():
             background-color: var(--primary-color);
         }
         
-        /* Input fields */
+        /* Input fields - Purple border on focus */
+        .stTextInput > div > div > input,
+        .stNumberInput > div > div > input,
+        .stTextArea > div > div > textarea {
+            border-radius: 4px !important;
+            border: 1px solid #ddd !important;
+            transition: border-color 0.3s ease !important;
+        }
+        
         .stTextInput > div > div > input:focus,
         .stNumberInput > div > div > input:focus,
         .stTextArea > div > div > textarea:focus {
-            border-color: var(--primary-color) !important;
-            box-shadow: 0 0 0 1px var(--primary-color) !important;
+            border-color: #7e57c2 !important;
+            box-shadow: 0 0 0 1px #7e57c2 !important;
+            outline: none !important;
         }
         
         /* AGGRESSIVE FIX: Hide ALL icons in alerts */

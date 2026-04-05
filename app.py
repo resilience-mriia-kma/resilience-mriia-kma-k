@@ -175,24 +175,27 @@ else:
             **Важливо:** Всі запитання є обов'язковими для надання відповіді.
             """)
         
-        # Placeholder results screen after evaluation
+        # Results screen with actual AI recommendations
         if st.session_state.evaluation_complete:
             st.markdown("### Результати аналізу")
             
-            st.info("Тут будуть рекомендації від ШІ-агента...")
+            # Display AI recommendations if available
+            if "ai_recommendations" in st.session_state and st.session_state.ai_recommendations:
+                st.markdown(st.session_state.ai_recommendations)
+            else:
+                st.info("Рекомендації генеруються...")
             
             st.caption("⚠️ Штучний інтелект може помилятися. Будь ласка, перевіряйте важливу інформацію.")
             
             st.divider()
             
-            # Navigation buttons
+            # Navigation buttons (no Back button - results are final)
             col1, col2 = st.columns(2)
             
             with col1:
-                # Back button to return to Factor 5
-                if st.button("Назад", use_container_width=True):
-                    st.session_state.evaluation_complete = False
-                    st.session_state.current_step = 5
+                # Option to evaluate another student
+                if st.button("➕ Оцінити наступного учня", use_container_width=True):
+                    reset_evaluation_state()
                     st.rerun()
             
             with col2:
@@ -201,14 +204,10 @@ else:
                     st.session_state.show_feedback = True
                     st.rerun()
             
-            st.divider()
-            
-            # Option to evaluate another student
-            if st.button("➕ Оцінити наступного учня", type="secondary", use_container_width=True):
-                reset_evaluation_state()
-                st.rerun()
-            
             st.stop()
+        
+        # Invisible anchor for scroll-to-top
+        st.markdown('<div id="top"></div>', unsafe_allow_html=True)
         
         # Scroll to top on step change
         st.markdown(
@@ -253,7 +252,7 @@ else:
                 "age": 10,
                 "gender": "Чоловіча",
                 "answers": {factor: [None] * len(questions) for factor, questions in QUESTIONS.items()},
-                "comments": {factor: "" for factor in QUESTIONS.keys()}
+                "question_comments": {factor: [""] * len(questions) for factor, questions in QUESTIONS.items()}
             }
         
         # Step 0: Загальна інформація (Identification)
@@ -313,7 +312,7 @@ else:
             # Navigation for Step 0 - Full width button
             if st.button("Далі", key="next_btn_step0", type="primary", use_container_width=True):
                 if not st.session_state.form_data["s_id"]:
-                    st.toast("Вкажіть ID учня")
+                    st.toast("Вкажіть ID учня.")
                 else:
                     # Lock student data after leaving Step 0
                     lock_student_data()
@@ -329,7 +328,7 @@ else:
             st.subheader(current_factor)
             st.caption(f"Крок {st.session_state.current_step + 1} з 6")
             
-            # Display questions for current factor
+            # Display questions for current factor with individual comments
             for q_idx, q in enumerate(current_questions):
                 current_answer = st.session_state.form_data["answers"][current_factor][q_idx]
                 ans = st.radio(
@@ -340,20 +339,18 @@ else:
                     horizontal=True
                 )
                 st.session_state.form_data["answers"][current_factor][q_idx] = ans
+                
+                # Individual comment input for each question
+                current_comment = st.session_state.form_data["question_comments"][current_factor][q_idx]
+                comment = st.text_input(
+                    "Коментар (необов'язково)",
+                    value=current_comment,
+                    key=f"comment_{st.session_state.current_step}_{q_idx}",
+                    placeholder="Опишіть конкретну ситуацію..."
+                )
+                st.session_state.form_data["question_comments"][current_factor][q_idx] = comment
+                
                 st.divider()
-            
-            # Text area for observations (OPTIONAL)
-            st.markdown("**Ваші спостереження (необов'язково)**")
-            st.caption("Опис конкретних ситуацій допоможе ШІ надати точніші рекомендації у результаті.")
-            comment = st.text_area(
-                f"Спостереження щодо фактору '{current_factor}':",
-                value=st.session_state.form_data["comments"][current_factor],
-                key=f"comment_{st.session_state.current_step}",
-                height=100,
-                placeholder="Опишіть конкретні ситуації або приклади поведінки...",
-                label_visibility="collapsed"
-            )
-            st.session_state.form_data["comments"][current_factor] = comment
             
             st.divider()
             
@@ -372,7 +369,7 @@ else:
                 if st.session_state.current_step < 5:
                     if st.button("Далі", key="next_btn", type="primary", use_container_width=True):
                         if not all_answered:
-                            st.toast("Будь ласка, дайте відповідь на всі запитання, щоб продовжити", icon="⚠️")
+                            st.toast("Надайте відповіді на всі запитання, щоб продовжити.")
                         else:
                             st.session_state.completed_steps.add(st.session_state.current_step)
                             st.session_state.current_step += 1
@@ -394,15 +391,53 @@ else:
                                 error_msg = "Будь ласка, заповніть всі обов'язкові поля: " + ", ".join(validation_errors)
                                 st.toast(error_msg, icon="⚠️")
                             else:
-                                # Calculate scores (no AI call)
+                                # Check API key before proceeding
+                                if not validate_api_key_available():
+                                    st.stop()
+                                
+                                # Calculate scores
                                 calculated_scores = calculate_factor_scores(st.session_state.form_data, factor_names)
                                 time_taken = int(time.time() - st.session_state.start_time)
                                 
-                                # Mark evaluation as complete
-                                st.session_state.students_evaluated += 1
-                                st.session_state.evaluation_complete = True
-                                st.session_state.form_data = None
+                                # Map factor names to schema fields
+                                factor_mapping = {
+                                    "Підтримка сім'ї": ("family_support", "family_support_comments"),
+                                    "Оптимізм": ("optimism", "optimism_comments"),
+                                    "Цілеспрямованість та копінг": ("coping", "coping_comments"),
+                                    "Соціальні зв'язки": ("social_connections", "social_connections_comments"),
+                                    "Здоров'я": ("health", "health_comments")
+                                }
                                 
-                                # Show celebration
-                                st.balloons()
-                                st.rerun()
+                                # Build submission with individual comments
+                                submission_data = {
+                                    "teacher_id": st.session_state.form_data["t_id"],
+                                    "student_id": st.session_state.form_data["s_id"],
+                                    "student_age": st.session_state.form_data["age"],
+                                    "student_gender": st.session_state.form_data["gender"],
+                                    "time_taken_seconds": time_taken
+                                }
+                                
+                                # Add scores and comments for each factor
+                                for factor_name, (score_key, comments_key) in factor_mapping.items():
+                                    submission_data[f"{score_key}_score"] = calculated_scores.get(factor_name, 1)
+                                    submission_data[comments_key] = st.session_state.form_data["question_comments"].get(factor_name, [])
+                                
+                                submission = TeacherFormSubmission(**submission_data)
+                                
+                                # Call AI agent
+                                with st.spinner("ШІ аналізує профіль та шукає доказові практики..."):
+                                    try:
+                                        agent = ResilienceAgent()
+                                        result = agent.generate_advice(submission)
+                                        
+                                        # Store AI result in session state
+                                        st.session_state.ai_recommendations = result
+                                        st.session_state.students_evaluated += 1
+                                        st.session_state.evaluation_complete = True
+                                        
+                                        # Show celebration
+                                        st.balloons()
+                                        st.rerun()
+                                        
+                                    except Exception as e:
+                                        st.error(f"Сталася помилка при зверненні до ШІ: {e}")

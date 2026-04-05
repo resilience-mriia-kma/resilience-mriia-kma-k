@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Optional
+from typing import Optional, Dict, List
 
 class TeacherFormSubmission(BaseModel):
     teacher_id: str = Field(..., description="Унікальний ID вчителя")
@@ -13,11 +13,12 @@ class TeacherFormSubmission(BaseModel):
     social_connections_score: Optional[int] = Field(None, ge=0, le=2)
     health_score: Optional[int] = Field(None, ge=0, le=2)
     
-    family_support_comment: Optional[str] = Field(None)
-    optimism_comment: Optional[str] = Field(None)
-    coping_comment: Optional[str] = Field(None)
-    social_connections_comment: Optional[str] = Field(None)
-    health_comment: Optional[str] = Field(None)
+    # Individual question comments: {factor_name: [comment1, comment2, ...]}
+    family_support_comments: Optional[List[str]] = Field(default_factory=list)
+    optimism_comments: Optional[List[str]] = Field(default_factory=list)
+    coping_comments: Optional[List[str]] = Field(default_factory=list)
+    social_connections_comments: Optional[List[str]] = Field(default_factory=list)
+    health_comments: Optional[List[str]] = Field(default_factory=list)
     
     time_taken_seconds: int = Field(...)
     

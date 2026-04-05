@@ -103,15 +103,23 @@ def initialize_session_state():
 
 def reset_evaluation_state():
     """Reset evaluation state for a new student assessment."""
+    from src.constants import QUESTIONS
+    
     st.session_state.evaluation_complete = False
     st.session_state.current_step = 0
     st.session_state.completed_steps = set()
     st.session_state.student_data_locked = False
     st.session_state.start_time = None
     
-    # Clear form data
-    if "form_data" in st.session_state:
-        st.session_state.form_data = None
+    # Initialize form data with empty structure (never set to None)
+    st.session_state.form_data = {
+        "t_id": st.session_state.teacher_id,
+        "s_id": "",
+        "age": 10,
+        "gender": "Чоловіча",
+        "answers": {factor: [None] * len(questions) for factor, questions in QUESTIONS.items()},
+        "question_comments": {factor: [""] * len(questions) for factor, questions in QUESTIONS.items()}
+    }
 
 
 def lock_student_data():
