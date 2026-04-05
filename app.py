@@ -7,7 +7,7 @@ st.set_page_config(page_title="Помічник Педагога", page_icon="",
 if "consent_given" not in st.session_state:
     st.session_state.consent_given = False
 
-# Словник із запитаннями
+# Словник із запитаннями з офіційного скрінера
 QUESTIONS = {
     "Підтримка сім'ї": [
         "3. Батьки проявляють інтерес до досвіду дитини (цікавляться її справами, переживаннями)",
@@ -48,7 +48,6 @@ QUESTIONS = {
     ]
 }
 
-# Офіційна шкала відповідей
 OPTIONS = [
     "0 — низький рівень",
     "1 — середній рівень",
@@ -72,52 +71,64 @@ if not st.session_state.consent_given:
             st.session_state.consent_given = True
             st.rerun()
         else:
-            st.error(" Для продовження роботи необхідно надати згоду.")
+            st.error("Для продовження роботи необхідно надати згоду.")
 else:
     st.markdown("**Система оцінки резильєнтності та генерації науково обґрунтованих рекомендацій.**")
-    st.divider()
-
+    
     with st.form("resilience_form"):
-        st.subheader("1. Ідентифікація (Анонімізована)")
-        col1, col2 = st.columns(2)
-        with col1:
-            t_id = st.text_input("Ваш ID (вчителя)", placeholder="напр., TCH-001")
-            s_id = st.text_input("Анонімний ID учня", placeholder="напр., STU-104")
-        with col2:
-            age = st.number_input("Вік учня", min_value=6, max_value=18, value=10)
-            gender = st.selectbox("Стать", ["Чоловіча", "Жіноча", "Інше"])
+        # Створюємо вкладки (пагінацію)
+        tabs = st.tabs([
+            " 1. Ідентифікація", 
+            " 2. Сім'я", 
+            " 3. Оптимізм", 
+            " 4. Копінг", 
+            " 5. Соціум", 
+            " 6. Здоров'я", 
+            " 7. Фінал"
+        ])
 
-        st.subheader("2. Опитник резільєнтності (Версія педагога)")
-        st.caption("Оцініть рівень прояву кожної характеристики вашого учня на основі доступних Вам спостережень за останні 2–4 тижні.")
-        
-        calculated_scores = {}
+        with tabs[0]:
+            st.subheader("Ідентифікація (Анонімізована)")
+            col1, col2 = st.columns(2)
+            with col1:
+                t_id = st.text_input("Ваш ID (вчителя)", placeholder="напр., TCH-001")
+                s_id = st.text_input("Анонімний ID учня", placeholder="напр., STU-104")
+            with col2:
+                age = st.number_input("Вік учня", min_value=6, max_value=18, value=10)
+                gender = st.selectbox("Стать", ["Чоловіча", "Жіноча", "Інше"])
 
-        # Генерація питань з офіційного документа
-        for factor, questions in QUESTIONS.items():
-            st.markdown(f"#### {factor}")
-            factor_answers = []
-            
-            for q in questions:
-                ans = st.radio(q, OPTIONS, key=q, horizontal=True)
-                # Якщо відповідь не NA, беремо першу цифру (0, 1 або 2)
-                if not ans.startswith("NA"):
-                    factor_answers.append(int(ans[0]))
-            
-            # Математичний обрахунок середнього балу для фактора
-            if factor_answers:
-                calculated_scores[factor] = round(sum(factor_answers) / len(factor_answers))
-            else:
-                calculated_scores[factor] = 1 # Значення за замовчуванням, якщо всюди обрано NA
+        # Зберігаємо відповіді по категоріях
+        raw_answers = {factor: [] for factor in QUESTIONS.keys()}
 
-        st.markdown("#### Додатково")
-        comment = st.text_area("Додаткові спостереження (необов'язково)")
-        submitted = st.form_submit_button("Аналізувати та отримати рекомендації", type="primary")
+        # Генеруємо сторінки для кожного фактору
+        for i, (factor, questions) in enumerate(QUESTIONS.items()):
+            with tabs[i+1]:
+                st.subheader(f"Оцінка: {factor}")
+                for q in questions:
+                    ans = st.radio(f"**{q}**", OPTIONS, key=q)
+                    raw_answers[factor].append(ans)
+                    st.divider()
+
+        with tabs[6]:
+            st.subheader("Завершення та відправка")
+            comment = st.text_area("Додаткові спостереження (необов'язково)")
+            st.info(" Переконайтеся, що ви пройшли всі вкладки перед відправкою форми.")
+            submitted = st.form_submit_button("Аналізувати та отримати рекомендації", type="primary")
 
         if submitted:
             if not t_id or not s_id:
-                st.error("Будь ласка, заповніть ID вчителя та учня.")
+                st.error("Будь ласка, поверніться на першу вкладку та заповніть ID вчителя та учня.")
             else:
-                # Передаємо пораховані бали у твою готову схему
+                calculated_scores = {}
+                
+                # Рахуємо середній бал тільки після відправки форми
+                for factor in QUESTIONS.keys():
+                    numeric_answers = [int(a[0]) for a in raw_answers[factor] if not a.startswith("NA")]
+                    if numeric_answers:
+                        calculated_scores[factor] = round(sum(numeric_answers) / len(numeric_answers))
+                    else:
+                        calculated_scores[factor] = 1 # Дефолтне значення, якщо скрізь NA
+
                 submission = TeacherFormSubmission(
                     teacher_id=t_id, student_id=s_id, student_age=age, student_gender=gender,
                     family_support_score=calculated_scores["Підтримка сім'ї"], 
