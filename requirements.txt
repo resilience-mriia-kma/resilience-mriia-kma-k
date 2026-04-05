@@ -1,0 +1,7 @@
+openai
+psycopg2-binary
+pgvector
+pydantic
+python-docx
+python-dotenv
+streamlit
