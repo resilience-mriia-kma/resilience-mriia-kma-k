@@ -2,57 +2,139 @@ import streamlit as st
 from schemas import TeacherFormSubmission
 from rag_agent import ResilienceAgent
 
-# Налаштування сторінки
 st.set_page_config(page_title="Помічник Педагога", page_icon="", layout="centered")
 
+if "consent_given" not in st.session_state:
+    st.session_state.consent_given = False
+
+# Словник із запитаннями
+QUESTIONS = {
+    "Підтримка сім'ї": [
+        "3. Батьки проявляють інтерес до досвіду дитини (цікавляться її справами, переживаннями)",
+        "5. Батьки реагують на труднощі дитини підтримуюче (обговорюють, допомагають, пояснюють)",
+        "11. Після взаємодії з батьками емоційний стан дитини зазвичай стабілізується або покращується",
+        "15. Батьки демонструють прийняття дитини (критикують дії, а не особистість)",
+        "18. У взаємодії батьків з дитиною не спостерігаються приниження, залякування або різкий осуд",
+        "23. У взаємодії з батьками дитина має можливість висловлюватися без знецінення"
+    ],
+    "Оптимізм": [
+        "1. У складних ситуаціях може знаходити позитивні аспекти",
+        "6. У поведінці переважає спокійний або позитивний емоційний фон",
+        "12. Виглядає задоволеною у повсякденній діяльності або взаємодії",
+        "19. Проявляє позитивні емоції у взаємодії (посмішка, зацікавленість, включеність)",
+        "24. Виглядає щасливою",
+        "26. У складних ситуаціях, підбадьорює однолітків"
+    ],
+    "Цілеспрямованість / копінг": [
+        "2. У складних ситуаціях використовує знайомі способи подолання труднощів",
+        "8. Ставить перед собою цілі і намагається їх досягати",
+        "13. Якщо завдання складне, пробує різні способи його виконання",
+        "20. Ініціює та підтримує взаємодію з іншими",
+        "25. Може висловити незгоду у прийнятний спосіб (без агресії)",
+        "27. У складних ситуаціях намагається знайти рішення, а не відмовляється від діяльності"
+    ],
+    "Соціальні зв'язки": [
+        "7. Вступає у контакт з новими людьми без виражених труднощів",
+        "9. Підтримує стабільні стосунки або дружні зв’язки",
+        "14. У взаємодії поводиться впевнено (без надмірної тривоги або уникання)",
+        "16. Легко взаємодіє з однолітками у різних ситуаціях",
+        "21. Знаходить спільну мову з різними людьми"
+    ],
+    "Здоров'я": [
+        "4. Протягом дня проявляє достатній рівень енергії та залученості в діяльність",
+        "10. Виглядає фізично бадьорою",
+        "17. У вільний час обирає рухливі ігри або заняття (біганина, спортивні ігри, активності на свіжому повітрі)",
+        "22. Турбується про своє здоров’я (гігієна, харчування, сон, шкідливі звички)"
+    ]
+}
+
+# Офіційна шкала відповідей
+OPTIONS = [
+    "0 — низький рівень",
+    "1 — середній рівень",
+    "2 — високий рівень",
+    "NA — недостатньо інформації"
+]
+
 st.title("Помічник Педагога")
-st.markdown("**Система оцінки резильєнтності та генерації науково обґрунтованих рекомендацій.**")
-st.divider()
 
-# Створюємо форму
-with st.form("resilience_form"):
-    st.subheader("1. Ідентифікація")
-    col1, col2 = st.columns(2)
-    with col1:
-        t_id = st.text_input("Ваш ID (вчителя)", placeholder="напр., TCH-001")
-        s_id = st.text_input("Анонімний ID учня", placeholder="напр., STU-104")
-    with col2:
-        age = st.number_input("Вік учня", min_value=6, max_value=18, value=10)
-        gender = st.selectbox("Стать", ["Чоловіча", "Жіноча", "Інше"])
-
-    st.subheader("2. Оцінка факторів резильєнтності")
-    st.caption("0 - Низький рівень, 1 - Середній рівень, 2 - Високий рівень")
-    
-    f_family = st.slider("Підтримка сім'ї", 0, 2, 1)
-    f_opt = st.slider("Оптимізм", 0, 2, 1)
-    f_coping = st.slider("Цілеспрямованість / копінг", 0, 2, 1)
-    f_social = st.slider("Соціальні зв'язки", 0, 2, 1)
-    f_health = st.slider("Здоров'я", 0, 2, 1)
-
-    comment = st.text_area("Додаткові спостереження (необов'язково)")
-
-    # Кнопка відправки
-    submitted = st.form_submit_button("Аналізувати та отримати рекомендації", type="primary")
-
-    if submitted:
-        if not t_id or not s_id:
-            st.error("Будь ласка, заповніть ID вчителя та учня.")
+if not st.session_state.consent_given:
+    st.subheader("Згода на збір та обробку даних")
+    st.info("""
+    **Будь ласка, ознайомтеся з правилами використання системи перед початком роботи:**
+    * **Data Collection:** Система збирає виключно анонімізовані оцінки факторів резильєнтності учнів.
+    * **Які дані зберігає кожне поле:** ID вчителя та учня є анонімними. Оцінки факторів зберігають числові значення (від 0 до 2).
+    * **Конфіденційність:** Дані НЕ ПЕРЕДАЮТЬСЯ третім сторонам.
+    """)
+    agree = st.checkbox("Я підтверджую, що ознайомлений(а) з політикою Data Processing, і даю згоду.")
+    if st.button("Продовжити", type="primary"):
+        if agree:
+            st.session_state.consent_given = True
+            st.rerun()
         else:
-            # Валідація даних через Pydantic (schemas.py)
-            submission = TeacherFormSubmission(
-                teacher_id=t_id, student_id=s_id, student_age=age, student_gender=gender,
-                family_support_score=f_family, optimism_score=f_opt, coping_score=f_coping,
-                social_connections_score=f_social, health_score=f_health, teacher_comment=comment
-            )
+            st.error(" Для продовження роботи необхідно надати згоду.")
+else:
+    st.markdown("**Система оцінки резильєнтності та генерації науково обґрунтованих рекомендацій.**")
+    st.divider()
 
-            with st.spinner("ШІ аналізує профіль та шукає доказові практики у базі знань..."):
-                try:
-                    # Викликаємо агента
-                    agent = ResilienceAgent()
-                    result = agent.generate_advice(submission)
-                    
-                    st.success("Аналіз завершено!")
-                    st.markdown("### 📋 Ваші рекомендації:")
-                    st.info(result)
-                except Exception as e:
-                    st.error(f"Сталася помилка при зверненні до LLM або Бази Даних: {e}")
+    with st.form("resilience_form"):
+        st.subheader("1. Ідентифікація (Анонімізована)")
+        col1, col2 = st.columns(2)
+        with col1:
+            t_id = st.text_input("Ваш ID (вчителя)", placeholder="напр., TCH-001")
+            s_id = st.text_input("Анонімний ID учня", placeholder="напр., STU-104")
+        with col2:
+            age = st.number_input("Вік учня", min_value=6, max_value=18, value=10)
+            gender = st.selectbox("Стать", ["Чоловіча", "Жіноча", "Інше"])
+
+        st.subheader("2. Опитник резільєнтності (Версія педагога)")
+        st.caption("Оцініть рівень прояву кожної характеристики вашого учня на основі доступних Вам спостережень за останні 2–4 тижні.")
+        
+        calculated_scores = {}
+
+        # Генерація питань з офіційного документа
+        for factor, questions in QUESTIONS.items():
+            st.markdown(f"#### {factor}")
+            factor_answers = []
+            
+            for q in questions:
+                ans = st.radio(q, OPTIONS, key=q, horizontal=True)
+                # Якщо відповідь не NA, беремо першу цифру (0, 1 або 2)
+                if not ans.startswith("NA"):
+                    factor_answers.append(int(ans[0]))
+            
+            # Математичний обрахунок середнього балу для фактора
+            if factor_answers:
+                calculated_scores[factor] = round(sum(factor_answers) / len(factor_answers))
+            else:
+                calculated_scores[factor] = 1 # Значення за замовчуванням, якщо всюди обрано NA
+
+        st.markdown("#### Додатково")
+        comment = st.text_area("Додаткові спостереження (необов'язково)")
+        submitted = st.form_submit_button("Аналізувати та отримати рекомендації", type="primary")
+
+        if submitted:
+            if not t_id or not s_id:
+                st.error("Будь ласка, заповніть ID вчителя та учня.")
+            else:
+                # Передаємо пораховані бали у твою готову схему
+                submission = TeacherFormSubmission(
+                    teacher_id=t_id, student_id=s_id, student_age=age, student_gender=gender,
+                    family_support_score=calculated_scores["Підтримка сім'ї"], 
+                    optimism_score=calculated_scores["Оптимізм"], 
+                    coping_score=calculated_scores["Цілеспрямованість / копінг"],
+                    social_connections_score=calculated_scores["Соціальні зв'язки"], 
+                    health_score=calculated_scores["Здоров'я"], 
+                    teacher_comment=comment
+                )
+
+                with st.spinner("ШІ аналізує профіль та шукає доказові практики у базі знань..."):
+                    try:
+                        agent = ResilienceAgent()
+                        result = agent.generate_advice(submission)
+                        
+                        st.success("Аналіз завершено!")
+                        st.markdown("### Ваші рекомендації:")
+                        st.info(result)
+                    except Exception as e:
+                        st.error(f"Сталася помилка при зверненні до LLM: {e}")
