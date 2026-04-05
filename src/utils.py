@@ -1,11 +1,8 @@
-"""
-Utility functions for the Resilience Assessment System
-Includes ID generation and API key management.
-"""
-
 import hashlib
 import os
 import streamlit as st
+
+from src.constants import QUESTIONS
 
 
 def generate_teacher_id(email: str) -> str:
@@ -31,13 +28,11 @@ def get_openai_api_key() -> str | None:
     Returns:
         str | None: API key if found, None otherwise
     """
-    # Try environment variable first
     api_key = os.getenv("OPENAI_API_KEY")
     
     if api_key:
         return api_key
     
-    # Try Streamlit secrets
     try:
         if "OPENAI_API_KEY" in st.secrets:
             return st.secrets["OPENAI_API_KEY"]
@@ -57,10 +52,7 @@ def validate_api_key_available() -> bool:
     api_key = get_openai_api_key()
     
     if not api_key:
-        st.toast(
-            "API ключ не налаштовано. Будь ласка, налаштуйте OPENAI_API_KEY у секретах або .env файлі.",
-            icon="⚠️"
-        )
+        st.toast("API ключ ще не налаштовано.")
         return False
     
     return True
@@ -103,8 +95,6 @@ def initialize_session_state():
 
 def reset_evaluation_state():
     """Reset evaluation state for a new student assessment."""
-    from src.constants import QUESTIONS
-    
     st.session_state.evaluation_complete = False
     st.session_state.current_step = 0
     st.session_state.completed_steps = set()
@@ -125,6 +115,46 @@ def reset_evaluation_state():
 def lock_student_data():
     """Lock student identification data after first step."""
     st.session_state.student_data_locked = True
+
+
+def build_ai_submission(form_data: dict):
+    """
+    Build TeacherFormSubmission object from form data.
+    
+    Args:
+        form_data: Dictionary containing all form responses
+        
+    Returns:
+        TeacherFormSubmission: Pydantic model ready for AI agent
+    """
+    from schemas import TeacherFormSubmission
+    
+    factor_names = list(QUESTIONS.keys())
+    calculated_scores = calculate_factor_scores(form_data, factor_names)
+    
+    # Map factor names to schema fields
+    factor_mapping = {
+        "Підтримка сім'ї": ("family_support", "family_support_comments"),
+        "Оптимізм": ("optimism", "optimism_comments"),
+        "Цілеспрямованість та копінг": ("coping", "coping_comments"),
+        "Соціальні зв'язки": ("social_connections", "social_connections_comments"),
+        "Здоров'я": ("health", "health_comments")
+    }
+    
+    # Build submission data
+    submission_data = {
+        "teacher_id": form_data["t_id"],
+        "student_id": form_data["s_id"],
+        "student_age": form_data["age"],
+        "student_gender": form_data["gender"]
+    }
+    
+    # Add scores and comments for each factor
+    for factor_name, (score_key, comments_key) in factor_mapping.items():
+        submission_data[f"{score_key}_score"] = calculated_scores.get(factor_name, 0)
+        submission_data[comments_key] = form_data["question_comments"].get(factor_name, [])
+    
+    return TeacherFormSubmission(**submission_data)
 
 
 def calculate_factor_scores(form_data: dict, factor_names: list) -> dict:
@@ -150,6 +180,6 @@ def calculate_factor_scores(form_data: dict, factor_names: list) -> dict:
         if numeric_answers:
             calculated_scores[factor] = round(sum(numeric_answers) / len(numeric_answers))
         else:
-            calculated_scores[factor] = 1  # Default value if all NA
+            calculated_scores[factor] = 0  # Default value if all NA
     
     return calculated_scores

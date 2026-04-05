@@ -20,6 +20,5 @@ class TeacherFormSubmission(BaseModel):
     social_connections_comments: Optional[List[str]] = Field(default_factory=list)
     health_comments: Optional[List[str]] = Field(default_factory=list)
     
-    time_taken_seconds: int = Field(...)
-    
-    teacher_comment: Optional[str] = Field(None, description="Текстовий коментар вчителя")
+    time_taken_seconds: Optional[int] = Field(None)
+    teacher_comment: Optional[str] = Field(None)

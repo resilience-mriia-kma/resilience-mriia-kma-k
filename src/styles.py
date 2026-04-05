@@ -1,9 +1,27 @@
-"""
-Custom CSS styles for the Resilience Assessment System
-Purple theme with professional, clean design.
-"""
-
 import streamlit as st
+
+
+def render_stepper(stepper_labels, current_step, completed_steps):
+    """Generate stepper HTML with flexbox for uniform width."""
+    stepper_html = "<div style='display: flex; gap: 0.5rem; margin-bottom: 1rem;'>"
+    for idx, step_label in enumerate(stepper_labels):
+        if idx in completed_steps:
+            stepper_html += f"<div class='step-completed'>{step_label}</div>"
+        elif idx == current_step:
+            stepper_html += f"<div class='step-current'><strong>{step_label}</strong></div>"
+        else:
+            stepper_html += f"<div class='step-locked'>{step_label}</div>"
+    stepper_html += "</div>"
+    return stepper_html
+
+
+def scroll_to_top():
+    """Inject JavaScript to scroll to top of main container."""
+    st.markdown('<div id="top"></div>', unsafe_allow_html=True)
+    st.markdown(
+        '<script>window.parent.document.querySelector("section.main").scrollTo(0,0);</script>',
+        unsafe_allow_html=True
+    )
 
 
 def apply_custom_styles():
