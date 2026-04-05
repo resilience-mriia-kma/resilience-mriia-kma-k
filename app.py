@@ -7,7 +7,7 @@ st.set_page_config(page_title="Помічник Педагога", page_icon="",
 if "consent_given" not in st.session_state:
     st.session_state.consent_given = False
 
-# Словник із запитаннями з офіційного скрінера
+# Словник із запитаннями
 QUESTIONS = {
     "Підтримка сім'ї": [
         "3. Батьки проявляють інтерес до досвіду дитини (цікавляться її справами, переживаннями)",
@@ -55,10 +55,10 @@ OPTIONS = [
     "NA — недостатньо інформації"
 ]
 
-st.title("Помічник Педагога")
+st.title(" Помічник Педагога")
 
 if not st.session_state.consent_given:
-    st.subheader("Згода на збір та обробку даних")
+    st.subheader(" Згода на збір та обробку даних")
     st.info("""
     **Будь ласка, ознайомтеся з правилами використання системи перед початком роботи:**
     * **Data Collection:** Система збирає виключно анонімізовані оцінки факторів резильєнтності учнів.
@@ -71,7 +71,7 @@ if not st.session_state.consent_given:
             st.session_state.consent_given = True
             st.rerun()
         else:
-            st.error("Для продовження роботи необхідно надати згоду.")
+            st.error(" Для продовження роботи необхідно надати згоду.")
 else:
     st.markdown("**Система оцінки резильєнтності та генерації науково обґрунтованих рекомендацій.**")
     
@@ -105,7 +105,8 @@ else:
             with tabs[i+1]:
                 st.subheader(f"Оцінка: {factor}")
                 for q in questions:
-                    ans = st.radio(f"**{q}**", OPTIONS, key=q)
+                    # index=None гарантує, що поле буде порожнім на старті
+                    ans = st.radio(f"**{q}**", OPTIONS, key=q, index=None)
                     raw_answers[factor].append(ans)
                     st.divider()
 
@@ -116,12 +117,16 @@ else:
             submitted = st.form_submit_button("Аналізувати та отримати рекомендації", type="primary")
 
         if submitted:
+            # ПЕРЕВІРКА 1: Чи заповнені ID
             if not t_id or not s_id:
-                st.error("Будь ласка, поверніться на першу вкладку та заповніть ID вчителя та учня.")
+                st.error(" Будь ласка, поверніться на першу вкладку та заповніть ID вчителя та учня.")
+            # ПЕРЕВІРКА 2: Чи є пропущені запитання (ans == None)
+            elif any(None in answers for answers in raw_answers.values()):
+                st.error(" Ви пропустили одне або кілька запитань. Будь ласка, перевірте всі вкладки і дайте відповідь на всі 27 запитань (або оберіть 'NA', якщо у вас недостатньо інформації).")
             else:
                 calculated_scores = {}
                 
-                # Рахуємо середній бал тільки після відправки форми
+                # Рахуємо середній бал тільки якщо всі перевірки пройдені
                 for factor in QUESTIONS.keys():
                     numeric_answers = [int(a[0]) for a in raw_answers[factor] if not a.startswith("NA")]
                     if numeric_answers:
