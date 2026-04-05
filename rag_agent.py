@@ -69,7 +69,6 @@ class ResilienceAgent:
             "Здоров'я": submission.health_score,
         }
         
-        # Process individual question comments
         comments_summary = []
         if submission.family_support_comments:
             non_empty = [c for c in submission.family_support_comments if c.strip()]
