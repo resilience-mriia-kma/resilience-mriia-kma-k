@@ -4,3 +4,4 @@ pgvector
 pydantic
 python-docx
 python-dotenv
+streamlit
