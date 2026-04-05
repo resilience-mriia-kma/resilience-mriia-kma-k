@@ -1,8 +1,3 @@
-"""
-Constants for the Resilience Assessment System
-Contains questions, options, and privacy policy text.
-"""
-
 # Assessment questions organized by resilience factors
 QUESTIONS = {
     "Підтримка сім'ї": [
@@ -63,7 +58,7 @@ SCORE_DEFINITIONS = """
 
 # Privacy policy text
 PRIVACY_POLICY = """
-### 📋 Політика збору та обробки даних
+### Політика збору та обробки даних
 
 **Мета дослідження:**  
 Ця система розроблена для допомоги педагогам у оцінці резильєнтності учнів та отримання науково обґрунтованих рекомендацій на основі штучного інтелекту.
@@ -88,12 +83,3 @@ PRIVACY_POLICY = """
 - Право на відкликання згоди у будь-який час
 - Право на видалення ваших даних за запитом
 """
-
-# Factor icons for visual representation
-FACTOR_ICONS = {
-    "Підтримка сім'ї": "👨‍👩‍👧",
-    "Оптимізм": "😊",
-    "Цілеспрямованість / копінг": "🎯",
-    "Соціальні зв'язки": "🤝",
-    "Здоров'я": "💪"
-}
