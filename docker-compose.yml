@@ -1,0 +1,9 @@
+services:
+  app:
+    image: resilience-app:latest
+    container_name: resilience-app
+    restart: always
+    ports:
+      - "8501:8501"
+    env_file:
+      - .env
