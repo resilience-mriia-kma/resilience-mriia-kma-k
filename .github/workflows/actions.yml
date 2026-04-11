@@ -28,6 +28,7 @@ jobs:
       run: |
           pylint $(git ls-files '*.py') --fail-under=5.0
   build:
+    needs: [test]
     runs-on: ubuntu-latest
 
     steps:
@@ -41,6 +42,7 @@ jobs:
         run: |
           docker build -t resilience-app .
   deploy:
+    needs: [test, build]
     runs-on: ubuntu-latest
 
     steps:
