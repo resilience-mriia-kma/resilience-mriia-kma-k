@@ -7,6 +7,7 @@ on:
     branches: [ "main" ]
 
 jobs:
+
   test:
     runs-on: ubuntu-latest
     strategy:
@@ -27,6 +28,7 @@ jobs:
     - name: Run Tests
       run: |
           pylint $(git ls-files '*.py') --fail-under=5.0
+
   build:
     needs: [test]
     runs-on: ubuntu-latest
@@ -41,14 +43,26 @@ jobs:
       - name: Build Docker image
         run: |
           docker build -t resilience-app .
-  deploy:
-    needs: [test, build]
-    runs-on: ubuntu-latest
 
-    steps:
       - name: Save Docker image to tar
         run: |
           docker save resilience-app:latest -o resilience-app.tar
+
+      - name: Upload image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-image
+          path: resilience-app.tar
+
+  deploy:
+    needs: [build]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: docker-image
 
       - name: Copy image to server
         uses: appleboy/scp-action@v0.1.7
@@ -73,12 +87,10 @@ jobs:
             echo "Loading Docker image..."
             docker load -i resilience-app.tar
 
-            echo "Starting/restarting app..."
+            echo "Restarting container..."
             docker compose up -d --force-recreate
 
-            echo "Cleaning up tar file..."
+            echo "Cleaning up..."
             rm -f resilience-app.tar
-
-            echo "Pruning unused images..."
             docker image prune -f
 
