@@ -1,5 +1,7 @@
+"""Utility functions for session state management, ID generation, and AI submission."""
 import hashlib
 import os
+
 import streamlit as st
 
 from src.constants import QUESTIONS
@@ -36,7 +38,7 @@ def get_openai_api_key() -> str | None:
     try:
         if "OPENAI_API_KEY" in st.secrets:
             return st.secrets["OPENAI_API_KEY"]
-    except Exception:
+    except Exception:  # pylint: disable=broad-except
         pass
     
     return None
@@ -127,7 +129,7 @@ def build_ai_submission(form_data: dict):
     Returns:
         TeacherFormSubmission: Pydantic model ready for AI agent
     """
-    from schemas import TeacherFormSubmission
+    from schemas import TeacherFormSubmission  # pylint: disable=import-outside-toplevel
     
     factor_names = list(QUESTIONS.keys())
     calculated_scores = calculate_factor_scores(form_data, factor_names)

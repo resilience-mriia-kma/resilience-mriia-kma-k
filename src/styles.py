@@ -1,3 +1,4 @@
+"""Custom CSS styles and UI helper components for the purple-themed Streamlit app."""
 import streamlit as st
 
 
@@ -47,7 +48,8 @@ def apply_custom_styles():
         }
         
         /* Button styling - Purple theme */
-        .stButton > button {
+        .stButton > button,
+        .stFormSubmitButton > button {
             background-color: var(--primary-color) !important;
             color: white !important;
             border-radius: 4px;
@@ -57,7 +59,8 @@ def apply_custom_styles():
             transition: all 0.3s ease;
         }
         
-        .stButton > button:hover {
+        .stButton > button:hover,
+        .stFormSubmitButton > button:hover {
             background-color: var(--secondary-color) !important;
             box-shadow: 0 2px 4px rgba(0,0,0,0.2);
             transform: translateY(-1px);
