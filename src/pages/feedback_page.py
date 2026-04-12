@@ -1,7 +1,9 @@
 """Feedback form page for teacher evaluation of the AI assistant system."""
-# pylint: disable=unused-variable
 import streamlit as st
+from pydantic import ValidationError
 
+from schemas import FeedbackSubmission
+from src.database import save_feedback
 from src.styles import scroll_to_top
 from src.utils import reset_evaluation_state
 
@@ -304,8 +306,58 @@ def render_feedback_form():
             )
         
         if submit_btn:
-            st.success("Дякуємо за ваш відгук! Цей внесок суттєво допоможе вдосконалити систему.")
-            st.session_state.feedback_submitted = True
+            form_data = {
+                "teacher_id": st.session_state.get("teacher_id"),
+                "experience": experience,
+                "grades": grades,
+                "subject": subject or None,
+                "completed": completed,
+                "students_count": students_count,
+                "ease_of_use": ease_of_use,
+                "acceptability_1": acceptability_1,
+                "acceptability_2": acceptability_2,
+                "acceptability_3": acceptability_3,
+                "appropriateness_1": appropriateness_1,
+                "appropriateness_2": appropriateness_2,
+                "appropriateness_3": appropriateness_3,
+                "feasibility_1": feasibility_1,
+                "feasibility_2": feasibility_2,
+                "feasibility_3": feasibility_3,
+                "usability_1": usability_1,
+                "usability_2": usability_2,
+                "usability_3": usability_3,
+                "llm_1": llm_1,
+                "llm_2": llm_2,
+                "llm_3": llm_3,
+                "llm_4": llm_4,
+                "safety_1": safety_1,
+                "safety_2": safety_2,
+                "safety_3": safety_3,
+                "intention_1": intention_1,
+                "intention_2": intention_2,
+                "open_1": open_1 or None,
+                "open_2": open_2 or None,
+                "open_3": open_3 or None,
+                "open_4": open_4 or None,
+                "helped_understand": helped_understand,
+                "changes_made": changes_made or None,
+            }
+            try:
+                submission = FeedbackSubmission(**form_data)
+                saved = save_feedback(submission)
+                if saved:
+                    st.success(
+                        "Дякуємо за ваш відгук! "
+                        "Цей внесок суттєво допоможе вдосконалити систему."
+                    )
+                else:
+                    st.warning(
+                        "Відгук не вдалося зберегти. "
+                        "Перевірте з'єднання з базою даних."
+                    )
+                st.session_state.feedback_submitted = True
+            except ValidationError as exc:
+                st.error(f"Помилка валідації: {exc}")
         
         if back_btn:
             st.session_state.show_feedback = False
