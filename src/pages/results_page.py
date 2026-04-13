@@ -14,7 +14,7 @@ def render_results_page():
         else ""
     )
 
-    st.title(f"Рекомендації для дитини ({student_id})")
+    st.title(f"{student_id}: рекомендації")
 
     st.markdown("""
     Дякуємо за завершення оцінювання!
@@ -25,6 +25,7 @@ def render_results_page():
 
     st.divider()
 
-    if st.button("Оцінити систему"):
-        st.session_state.show_feedback = True
-        st.rerun()
+    if st.session_state.get("can_rate_system", False):
+        if st.button("Оцінити систему", type="primary"):
+            st.session_state.show_feedback = True
+            st.rerun()

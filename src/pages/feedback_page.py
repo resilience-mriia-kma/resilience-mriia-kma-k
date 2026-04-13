@@ -308,6 +308,7 @@ def render_feedback_form():
         if submit_btn:
             form_data = {
                 "teacher_id": st.session_state.get("teacher_id"),
+                "submission_id": st.session_state.get("submission_id"),
                 "experience": experience,
                 "grades": grades,
                 "subject": subject or None,
