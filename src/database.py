@@ -24,6 +24,29 @@ def connect_to_db():
         return None
 
 
+def check_has_submissions(teacher_id: str) -> bool:
+    """Check whether a teacher has at least one saved student submission."""
+    if not teacher_id:
+        return False
+    conn = connect_to_db()
+    if not conn:
+        return False
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM submissions WHERE teacher_id = %s LIMIT 1",
+            (teacher_id,)
+        )
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result is not None
+    except Exception as e:  # pylint: disable=broad-except
+        print(f"Помилка перевірки submissions: {e}")
+        conn.close()
+        return False
+
+
 def save_feedback(feedback) -> bool:
     """Save a FeedbackSubmission to the feedbacks table, creating it if needed."""
     conn = connect_to_db()
@@ -37,6 +60,7 @@ def save_feedback(feedback) -> bool:
                 id SERIAL PRIMARY KEY,
                 created_at TIMESTAMP DEFAULT NOW(),
                 teacher_id VARCHAR(20),
+                submission_id VARCHAR(50),
                 experience VARCHAR(50),
                 grades TEXT,
                 subject TEXT,
@@ -63,7 +87,7 @@ def save_feedback(feedback) -> bool:
         grades_str = ", ".join(feedback.grades) if feedback.grades else None
         cur.execute("""
             INSERT INTO feedbacks (
-                teacher_id, experience, grades, subject,
+                teacher_id, submission_id, experience, grades, subject,
                 completed, students_count, ease_of_use,
                 acceptability_1, acceptability_2, acceptability_3,
                 appropriateness_1, appropriateness_2, appropriateness_3,
@@ -75,15 +99,15 @@ def save_feedback(feedback) -> bool:
                 open_1, open_2, open_3, open_4,
                 helped_understand, changes_made
             ) VALUES (
-                %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s
             )
         """, (
-            feedback.teacher_id, feedback.experience,
-            grades_str, feedback.subject,
+            feedback.teacher_id, feedback.submission_id,
+            feedback.experience, grades_str, feedback.subject,
             feedback.completed, feedback.students_count,
             feedback.ease_of_use,
             feedback.acceptability_1, feedback.acceptability_2,

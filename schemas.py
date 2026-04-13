@@ -30,6 +30,7 @@ class FeedbackSubmission(BaseModel):
     """Pydantic model for 11-block teacher feedback form validation."""
 
     teacher_id: Optional[str] = None
+    submission_id: Optional[str] = None
 
     # Block 1: Загальна інформація
     experience: Optional[str] = None
