@@ -6,7 +6,6 @@ __pycache__/
 .env.*
 .git/
 .github/
-.streamlit/
 .venv/
 venv/
 node_modules/
