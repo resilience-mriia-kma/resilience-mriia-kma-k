@@ -1,5 +1,5 @@
 # resilience-mriia-ml
-
+[![Deploy form to server](https://github.com/resilience-mriia-kma/resilience-mriia-kma-k/actions/workflows/actions.yml/badge.svg)](https://github.com/resilience-mriia-kma/resilience-mriia-kma-k/actions/workflows/actions.yml)
 
 ## Склад команди: 
 - Демʼянік Катерина 
