@@ -2,6 +2,7 @@
 import streamlit as st
 
 from src.constants import PRIVACY_POLICY
+from src.database import check_has_submissions
 from src.utils import generate_teacher_id
 
 
@@ -57,6 +58,7 @@ def render_consent_page():
             generated_id = generate_teacher_id(teacher_email.strip())
             st.session_state.teacher_id = generated_id
             st.session_state.consent_given = True
-
-            st.toast(f"Згенеровано ID: {generated_id}")
+            st.session_state.can_rate_system = check_has_submissions(
+                generated_id
+            )
             st.rerun()

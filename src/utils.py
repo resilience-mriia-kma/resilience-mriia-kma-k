@@ -1,6 +1,7 @@
 """Utility functions for session state management, ID generation, and AI submission."""
 import hashlib
 import os
+import uuid
 
 import streamlit as st
 
@@ -94,6 +95,12 @@ def initialize_session_state():
     if "student_data_locked" not in st.session_state:
         st.session_state.student_data_locked = False
 
+    # Analytics and access control
+    if "submission_id" not in st.session_state:
+        st.session_state.submission_id = None
+    if "can_rate_system" not in st.session_state:
+        st.session_state.can_rate_system = False
+
 
 def reset_evaluation_state():
     """Reset evaluation state for a new student assessment."""
@@ -102,6 +109,7 @@ def reset_evaluation_state():
     st.session_state.completed_steps = set()
     st.session_state.student_data_locked = False
     st.session_state.start_time = None
+    st.session_state.submission_id = str(uuid.uuid4())
     
     # Initialize form data with empty structure (never set to None)
     st.session_state.form_data = {

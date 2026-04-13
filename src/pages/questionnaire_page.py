@@ -13,13 +13,7 @@ def render_step_0():
 
     col1, col2 = st.columns(2)
     with col1:
-        t_id = st.text_input(
-            "ID вчителя",
-            value=st.session_state.teacher_id,
-            disabled=True,
-            help="Ваш ID вже згенеровано автоматично",
-            key="t_id_display"
-        )
+        t_id = st.session_state.teacher_id
         s_id = st.text_input(
             "ID дитини",
             value=st.session_state.form_data["s_id"],
@@ -30,6 +24,14 @@ def render_step_0():
         )
         st.session_state.form_data["s_id"] = s_id
         st.session_state.form_data["t_id"] = t_id
+        st.markdown(
+            "<p style='color:grey; font-style:italic; font-size:0.8em;'>"
+            "Зафіксуйте цей код у робочому журналі поруч із прізвищем дитини "
+            "для подальшої її ідентифікації у системі."
+            "</p>",
+            unsafe_allow_html=True
+        )
+
 
     with col2:
         age = st.number_input(
@@ -132,6 +134,7 @@ def submit_evaluation():
 
     st.session_state.students_evaluated += 1
     st.session_state.evaluation_complete = True
+    st.session_state.can_rate_system = True
     st.balloons()
     st.rerun()
 
@@ -158,6 +161,10 @@ def render_questionnaire():
 
         **Важливо:** Всі запитання є обов'язковими для надання відповіді.
         """)
+        
+        if st.button("Оцінити систему", key="rate_btn_q", type="primary"):
+            st.session_state.show_feedback = True
+            st.rerun()
 
     st.markdown("")
     st.markdown("### Прогрес оцінювання")
