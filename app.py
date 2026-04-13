@@ -1,4 +1,5 @@
 """Main entry point for the Помічник педагога Streamlit application."""
+from dotenv import load_dotenv
 import streamlit as st
 
 from src.utils import initialize_session_state
@@ -7,6 +8,8 @@ from src.pages.consent_page import render_consent_page
 from src.pages.feedback_page import render_feedback_form
 from src.pages.results_page import render_results_page
 from src.pages.questionnaire_page import render_questionnaire
+
+load_dotenv()
 
 st.set_page_config(
     page_title="Помічник педагога",
