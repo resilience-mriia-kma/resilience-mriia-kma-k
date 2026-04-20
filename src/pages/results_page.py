@@ -10,6 +10,9 @@ def render_results_page():
     """Display recommendations page."""
     st.title("Рекомендації для вчителя")
 
+    if st.session_state.get("submission_id") is None:
+        st.session_state.submission_id = str(uuid.uuid4())
+
     if "current_advice" not in st.session_state:
         agent = ResilienceAgent()
 
