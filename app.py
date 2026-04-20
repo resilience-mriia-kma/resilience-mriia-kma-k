@@ -1,21 +1,18 @@
 """Main entry point for the Помічник педагога Streamlit application."""
-from dotenv import load_dotenv
-import streamlit as st
 
-from src.utils import initialize_session_state
-from src.styles import apply_custom_styles
+import streamlit as st
+from dotenv import load_dotenv
+
 from src.pages.consent_page import render_consent_page
 from src.pages.feedback_page import render_feedback_form
-from src.pages.results_page import render_results_page
 from src.pages.questionnaire_page import render_questionnaire
+from src.pages.results_page import render_results_page
+from src.styles import apply_custom_styles
+from src.utils import initialize_session_state
 
 load_dotenv()
 
-st.set_page_config(
-    page_title="Помічник педагога",
-    page_icon="👤",
-    layout="centered"
-)
+st.set_page_config(page_title="Помічник педагога", page_icon="👤", layout="centered")
 
 apply_custom_styles()
 initialize_session_state()

@@ -1,8 +1,9 @@
 """Questionnaire page with step-by-step resilience factor evaluation."""
+
 import streamlit as st
 
-from src.constants import QUESTIONS, OPTIONS
-from src.styles import scroll_to_top, render_stepper
+from src.constants import OPTIONS, QUESTIONS
+from src.styles import render_stepper, scroll_to_top
 from src.utils import lock_student_data
 
 
@@ -20,7 +21,7 @@ def render_step_0():
             placeholder="STU-001",
             help="Використовуйте умовний код БЕЗ імен чи прізвищ.",
             key="s_id_input",
-            disabled=st.session_state.student_data_locked
+            disabled=st.session_state.student_data_locked,
         )
         st.session_state.form_data["s_id"] = s_id
         st.session_state.form_data["t_id"] = t_id
@@ -29,9 +30,8 @@ def render_step_0():
             "Зафіксуйте цей код у робочому журналі поруч із прізвищем дитини "
             "для подальшої її ідентифікації у системі."
             "</p>",
-            unsafe_allow_html=True
+            unsafe_allow_html=True,
         )
-
 
     with col2:
         age = st.number_input(
@@ -40,7 +40,7 @@ def render_step_0():
             max_value=18,
             value=st.session_state.form_data["age"],
             key="age_input",
-            disabled=st.session_state.student_data_locked
+            disabled=st.session_state.student_data_locked,
         )
         st.session_state.form_data["age"] = age
 
@@ -49,7 +49,7 @@ def render_step_0():
             ["Чоловіча", "Жіноча"],
             index=0 if st.session_state.form_data["gender"] == "Чоловіча" else 1,
             key="gender_input",
-            disabled=st.session_state.student_data_locked
+            disabled=st.session_state.student_data_locked,
         )
         st.session_state.form_data["gender"] = gender
 
@@ -58,7 +58,9 @@ def render_step_0():
 
     st.divider()
 
-    if st.button("Далі", key="next_btn_step0", type="primary", use_container_width=True):
+    if st.button(
+        "Далі", key="next_btn_step0", type="primary", use_container_width=True
+    ):
         if not st.session_state.form_data["s_id"]:
             st.toast("Вкажіть ID дитини.")
         else:
@@ -80,16 +82,18 @@ def render_factor_step(step_number, factor_name, questions):
             OPTIONS,
             key=f"q_{step_number}_{q_idx}",
             index=OPTIONS.index(current_answer) if current_answer in OPTIONS else None,
-            horizontal=True
+            horizontal=True,
         )
         st.session_state.form_data["answers"][factor_name][q_idx] = ans
 
-        current_comment = st.session_state.form_data["question_comments"][factor_name][q_idx]
+        current_comment = st.session_state.form_data["question_comments"][factor_name][
+            q_idx
+        ]
         comment = st.text_input(
             "Коментар (необов'язково)",
             value=current_comment,
             key=f"comment_{step_number}_{q_idx}",
-            placeholder="Опишіть власні спостереження..."
+            placeholder="Опишіть власні спостереження...",
         )
         st.session_state.form_data["question_comments"][factor_name][q_idx] = comment
         st.divider()
@@ -101,10 +105,15 @@ def render_factor_step(step_number, factor_name, questions):
             st.rerun()
 
     with nav_col2:
-        all_answered = all(ans is not None for ans in st.session_state.form_data["answers"][factor_name])
+        all_answered = all(
+            ans is not None
+            for ans in st.session_state.form_data["answers"][factor_name]
+        )
 
         if step_number < 5:
-            if st.button("Далі", key="next_btn", type="primary", use_container_width=True):
+            if st.button(
+                "Далі", key="next_btn", type="primary", use_container_width=True
+            ):
                 if not all_answered:
                     st.toast("Надайте відповіді на всі запитання, щоб продовжити.")
                 else:
@@ -112,7 +121,12 @@ def render_factor_step(step_number, factor_name, questions):
                     st.session_state.current_step += 1
                     st.rerun()
         else:
-            if st.button("Отримати рекомендації", key="submit_btn", type="primary", use_container_width=True):
+            if st.button(
+                "Отримати рекомендації",
+                key="submit_btn",
+                type="primary",
+                use_container_width=True,
+            ):
                 if not all_answered:
                     st.toast("Надайте відповіді на всі запитання.")
                 else:
@@ -122,14 +136,17 @@ def render_factor_step(step_number, factor_name, questions):
 def submit_evaluation():
     """Handle final submission."""
     factor_names = list(QUESTIONS.keys())
-    
+
     validation_errors = []
     for factor in factor_names:
         if None in st.session_state.form_data["answers"][factor]:
             validation_errors.append(f"Пропущені запитання у блоці: {factor}")
-    
+
     if validation_errors:
-        st.toast("Будь ласка, заповніть всі обов'язкові поля: " + ", ".join(validation_errors))
+        st.toast(
+            "Будь ласка, заповніть всі обов'язкові поля: "
+            + ", ".join(validation_errors)
+        )
         return
 
     st.session_state.students_evaluated += 1
@@ -141,7 +158,7 @@ def submit_evaluation():
 
 def render_questionnaire():
     scroll_to_top()
-    
+
     st.title("Опитування")
 
     with st.expander("Інструкція з оцінювання та трактовка балів", expanded=False):
@@ -161,7 +178,7 @@ def render_questionnaire():
 
         **Важливо:** Всі запитання є обов'язковими для надання відповіді.
         """)
-        
+
         if st.button("Оцінити систему", key="rate_btn_q", type="primary"):
             st.session_state.show_feedback = True
             st.rerun()
@@ -169,8 +186,17 @@ def render_questionnaire():
     st.markdown("")
     st.markdown("### Прогрес оцінювання")
 
-    stepper_labels = ["Загальна інформація", "Фактор 1", "Фактор 2", "Фактор 3", "Фактор 4", "Фактор 5"]
-    stepper_html = render_stepper(stepper_labels, st.session_state.current_step, st.session_state.completed_steps)
+    stepper_labels = [
+        "Загальна інформація",
+        "Фактор 1",
+        "Фактор 2",
+        "Фактор 3",
+        "Фактор 4",
+        "Фактор 5",
+    ]
+    stepper_html = render_stepper(
+        stepper_labels, st.session_state.current_step, st.session_state.completed_steps
+    )
     st.markdown(stepper_html, unsafe_allow_html=True)
     st.divider()
 
@@ -180,8 +206,13 @@ def render_questionnaire():
             "s_id": "",
             "age": 10,
             "gender": "Чоловіча",
-            "answers": {factor: [None] * len(questions) for factor, questions in QUESTIONS.items()},
-            "question_comments": {factor: [""] * len(questions) for factor, questions in QUESTIONS.items()}
+            "answers": {
+                factor: [None] * len(questions)
+                for factor, questions in QUESTIONS.items()
+            },
+            "question_comments": {
+                factor: [""] * len(questions) for factor, questions in QUESTIONS.items()
+            },
         }
 
     if st.session_state.current_step == 0:
@@ -190,4 +221,6 @@ def render_questionnaire():
         factor_names = list(QUESTIONS.keys())
         current_factor = factor_names[st.session_state.current_step - 1]
         current_questions = QUESTIONS[current_factor]
-        render_factor_step(st.session_state.current_step, current_factor, current_questions)
+        render_factor_step(
+            st.session_state.current_step, current_factor, current_questions
+        )

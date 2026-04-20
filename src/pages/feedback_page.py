@@ -1,52 +1,60 @@
 """Feedback form page for teacher evaluation of the AI assistant system."""
+
 import streamlit as st
+from openai import OpenAI
 from pydantic import ValidationError
 
 from schemas import FeedbackSubmission
-from src.database import save_feedback
+from src.database import connect_to_db, save_feedback, save_learning_memory
 from src.styles import scroll_to_top
-from src.utils import reset_evaluation_state
+from src.utils import build_semantic_student_profile, reset_evaluation_state
 
-from openai import OpenAI
-from src.database import connect_to_db, save_learning_memory
-from src.utils import build_semantic_student_profile
 
 def process_feedback_for_learning(feedback_data: FeedbackSubmission):
     """AI Hook: Embeds the profile and updates the AI memory."""
-    llm_scores = [feedback_data.llm_1, feedback_data.llm_2, feedback_data.llm_3, feedback_data.llm_4]
+    llm_scores = [
+        feedback_data.llm_1,
+        feedback_data.llm_2,
+        feedback_data.llm_3,
+        feedback_data.llm_4,
+    ]
     valid_scores = [s for s in llm_scores if s is not None]
     if not valid_scores:
         return
     avg_score = sum(valid_scores) / len(valid_scores)
 
     critiques = []
-    if feedback_data.open_1: critiques.append(f"Корисне: {feedback_data.open_1}")
-    if feedback_data.open_4: critiques.append(f"Зміни: {feedback_data.open_4}")
-    if feedback_data.changes_made: critiques.append(f"Застосовані кроки: {feedback_data.changes_made}")
+    if feedback_data.open_1:
+        critiques.append(f"Корисне: {feedback_data.open_1}")
+    if feedback_data.open_4:
+        critiques.append(f"Зміни: {feedback_data.open_4}")
+    if feedback_data.changes_made:
+        critiques.append(f"Застосовані кроки: {feedback_data.changes_made}")
     combined_critique = " | ".join(critiques) if critiques else "Коментарів немає"
 
     client = OpenAI()
     conn = connect_to_db()
-    if not conn: return
+    if not conn:
+        return
 
     try:
         cur = conn.cursor()
         cur.execute(
             "SELECT form_data_json, llm_response FROM submissions WHERE id = %s",
-            (feedback_data.submission_id,)
+            (feedback_data.submission_id,),
         )
         result = cur.fetchone()
 
         if result:
             import json
+
             form_data = json.loads(result[0])
             llm_response = result[1]
 
             semantic_profile = build_semantic_student_profile(form_data)
 
             emb_response = client.embeddings.create(
-                input=semantic_profile,
-                model="text-embedding-3-small"
+                input=semantic_profile, model="text-embedding-3-small"
             )
 
             save_learning_memory(
@@ -55,12 +63,14 @@ def process_feedback_for_learning(feedback_data: FeedbackSubmission):
                 vector=emb_response.data[0].embedding,
                 response_text=llm_response,
                 avg_score=avg_score,
-                critique=combined_critique
+                critique=combined_critique,
             )
     except Exception as e:
         print(f"Помилка збереження в пам'ять ШІ: {e}")
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
+
 
 def render_feedback_form():
     """Render the comprehensive 11-block teacher feedback form."""
@@ -75,299 +85,299 @@ def render_feedback_form():
         "Введіть Ідентифікатор сесії (ID):",
         value=current_sub_id,
         placeholder="Наприклад: 550e8400-e29b-41d4-a716-446655440000",
-        help="Цей ID ви бачили на сторінці з рекомендаціями. Він потрібен для зв'язку відгуку з порадами ШІ."
+        help="Цей ID ви бачили на сторінці з рекомендаціями. Він потрібен для зв'язку відгуку з порадами ШІ.",
     )
 
-    st.markdown("### Оцінка використання ШІ-агента \"Помічник педагога\"")
-    
+    st.markdown('### Оцінка використання ШІ-агента "Помічник педагога"')
+
     with st.form("feedback_form"):
         st.subheader("1. Загальна інформація")
-        
+
         col1, col2 = st.columns(2)
         with col1:
             experience = st.radio(
                 "Ваш стаж педагогічної діяльності:",
                 ["До 3 років", "3–10 років", "10–20 років", "Більше 20 років"],
-                key="experience"
+                key="experience",
             )
-        
+
         with col2:
             grades = st.multiselect(
                 "Класи, з якими Ви працюєте:",
                 ["Початкова школа", "Середня школа", "Старша школа"],
-                key="grades"
+                key="grades",
             )
-        
-        subject = st.text_input("Предмет:", placeholder="Вкажіть предмети, які Ви викладаєте...", key="subject")
-        
+
+        subject = st.text_input(
+            "Предмет:",
+            placeholder="Вкажіть предмети, які Ви викладаєте...",
+            key="subject",
+        )
+
         st.divider()
-        
+
         st.subheader("2. Досвід використання інструменту")
-        
+
         col1, col2 = st.columns(2)
         with col1:
             completed = st.radio(
                 "Чи змогли Ви завершити оцінювання учнів за допомогою інструменту?",
                 ["Так", "Частково", "Ні"],
-                key="completed"
+                key="completed",
             )
-            
+
             students_count = st.radio(
                 "Скільки учнів Ви оцінили?",
                 ["1–3", "4–7", "8–12", "Більше 12"],
-                key="students_count"
+                key="students_count",
             )
-        
+
         with col2:
             ease_of_use = st.select_slider(
                 "Наскільки легко було використовувати інструмент?\n(1 — дуже складно, 5 — дуже легко)",
                 options=[1, 2, 3, 4, 5],
                 value=3,
-                key="ease_of_use"
+                key="ease_of_use",
             )
-        
+
         st.divider()
-        
+
         st.subheader("3. Прийнятність")
         st.caption("Наскільки Ви погоджуєтесь з твердженнями:")
-        
+
         acceptability_1 = st.select_slider(
             "Інструмент є корисним у моїй роботі",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="acceptability_1"
+            key="acceptability_1",
         )
-        
+
         acceptability_2 = st.select_slider(
             "Мені було комфортно використовувати цей інструмент",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="acceptability_2"
+            key="acceptability_2",
         )
-        
+
         acceptability_3 = st.select_slider(
             "Я б рекомендував(-ла) цей інструмент іншим вчителям",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="acceptability_3"
+            key="acceptability_3",
         )
-        
+
         st.divider()
-        
+
         st.subheader("4. Відповідність")
-        
+
         appropriateness_1 = st.select_slider(
             "Інструмент відповідає потребам моїх учнів",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="appropriateness_1"
+            key="appropriateness_1",
         )
-        
+
         appropriateness_2 = st.select_slider(
             "Інструмент відповідає умовам моєї школи",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="appropriateness_2"
+            key="appropriateness_2",
         )
-        
+
         appropriateness_3 = st.select_slider(
             "Питання інструменту відображають реальні ситуації в класі",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="appropriateness_3"
+            key="appropriateness_3",
         )
-        
+
         st.divider()
-        
+
         st.subheader("5. Здійсненність")
-        
+
         feasibility_1 = st.select_slider(
             "Я можу використовувати цей інструмент у своїй щоденній роботі",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="feasibility_1"
+            key="feasibility_1",
         )
-        
+
         feasibility_2 = st.select_slider(
             "Заповнення інструменту не займає надто багато часу",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="feasibility_2"
+            key="feasibility_2",
         )
-        
+
         feasibility_3 = st.select_slider(
             "Я розумію, як інтегрувати цей інструмент у свою практику",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="feasibility_3"
+            key="feasibility_3",
         )
-        
+
         st.divider()
-        
+
         st.subheader("6. Зручність використання")
-        
+
         usability_1 = st.select_slider(
             "Інтерфейс системи є зрозумілим",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="usability_1"
+            key="usability_1",
         )
-        
+
         usability_2 = st.select_slider(
             "Інструкції були зрозумілими",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="usability_2"
+            key="usability_2",
         )
-        
+
         usability_3 = st.select_slider(
             "Я легко орієнтувався(лась) у системі",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="usability_3"
+            key="usability_3",
         )
-        
+
         st.divider()
-        
+
         st.subheader("7. Оцінка ШІ-агента")
-        
+
         llm_1 = st.select_slider(
             "Рекомендації системи були зрозумілими",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="llm_1"
+            key="llm_1",
         )
-        
+
         llm_2 = st.select_slider(
             "Рекомендації виглядали релевантними до ситуацій учнів",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="llm_2"
+            key="llm_2",
         )
-        
+
         llm_3 = st.select_slider(
             "Рекомендації були практичними для використання",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="llm_3"
+            key="llm_3",
         )
-        
+
         llm_4 = st.select_slider(
             "Я довіряю рекомендаціям системи",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="llm_4"
+            key="llm_4",
         )
-        
+
         st.divider()
-        
+
         st.subheader("8. Безпека та етика")
-        
+
         safety_1 = st.select_slider(
             "Система не створює ризику стигматизації учнів",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="safety_1"
+            key="safety_1",
         )
-        
+
         safety_2 = st.select_slider(
             "Я розумію обмеження системи",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="safety_2"
+            key="safety_2",
         )
-        
+
         safety_3 = st.select_slider(
-            "Я не сприймаю рекомендації як \"діагноз\"",
+            'Я не сприймаю рекомендації як "діагноз"',
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="safety_3"
+            key="safety_3",
         )
-        
+
         st.divider()
-        
+
         st.subheader("9. Намір використання")
-        
+
         intention_1 = st.select_slider(
             "Я б використовував(-ла) цей інструмент у майбутньому",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="intention_1"
+            key="intention_1",
         )
-        
+
         intention_2 = st.select_slider(
             "Я б використовував(-ла) цей інструмент регулярно",
             options=[1, 2, 3, 4, 5],
             value=3,
-            key="intention_2"
+            key="intention_2",
         )
-        
+
         st.divider()
-        
+
         st.subheader("10. Відкриті питання")
-        
+
         open_1 = st.text_area(
             "Що було найбільш корисним у цьому інструменті?",
             placeholder="Ваша відповідь...",
             key="open_1",
-            height=100
+            height=100,
         )
-        
+
         open_2 = st.text_area(
             "Що було незрозумілим або складним?",
             placeholder="Ваша відповідь...",
             key="open_2",
-            height=100
+            height=100,
         )
-        
+
         open_3 = st.text_area(
             "Чи були рекомендації, які викликали сумніви або дискомфорт?",
             placeholder="Ваша відповідь...",
             key="open_3",
-            height=100
+            height=100,
         )
-        
+
         open_4 = st.text_area(
             "Які зміни Ви б запропонували?",
             placeholder="Ваша відповідь...",
             key="open_4",
-            height=100
+            height=100,
         )
-        
+
         st.divider()
-        
+
         st.subheader("11. Досвід роботи з учнями")
-        
+
         col1, col2 = st.columns(2)
         with col1:
             helped_understand = st.radio(
                 "Чи допоміг інструмент Вам краще зрозуміти учнів?",
                 ["Так", "Частково", "Ні"],
-                key="helped_understand"
+                key="helped_understand",
             )
-        
+
         with col2:
             changes_made = st.text_area(
                 "Чи змінили Ви щось у своїй роботі після використання інструменту?",
                 placeholder="Ваша відповідь...",
                 key="changes_made",
-                height=100
+                height=100,
             )
-        
+
         st.divider()
-        
+
         col1, col2 = st.columns(2)
         with col1:
             back_btn = st.form_submit_button(
-                "Повернутись до оцінки учнів",
-                type="primary",
-                use_container_width=True
+                "Повернутись до оцінки учнів", type="primary", use_container_width=True
             )
         with col2:
             submit_btn = st.form_submit_button(
-                "Надіслати відгук",
-                type="primary",
-                use_container_width=True
+                "Надіслати відгук", type="primary", use_container_width=True
             )
         if submit_btn:
             form_data = {
@@ -428,7 +438,7 @@ def render_feedback_form():
                 st.session_state.feedback_submitted = True
             except ValidationError as exc:
                 st.error(f"Помилка валідації: {exc}")
-        
+
         if back_btn:
             st.session_state.show_feedback = False
             st.session_state.feedback_submitted = False

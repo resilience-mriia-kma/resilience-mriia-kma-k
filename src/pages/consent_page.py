@@ -1,4 +1,5 @@
 """Consent and registration page for the teacher onboarding flow."""
+
 import streamlit as st
 
 from src.constants import PRIVACY_POLICY
@@ -36,12 +37,12 @@ def render_consent_page():
         help=(
             "Ваш адреса ніде НЕ зберігатиметься. "
             "Використовується лише для створення унікального анонімного ID."
-        )
+        ),
     )
 
     consent_checkbox = st.checkbox(
         "Я прочитав(-ла) інформацію про обробку даних і надаю згоду на участь у дослідженні.",
-        key="consent_checkbox"
+        key="consent_checkbox",
     )
 
     if st.button("Перейти до опитування", type="primary", use_container_width=True):
@@ -58,7 +59,5 @@ def render_consent_page():
             generated_id = generate_teacher_id(teacher_email.strip())
             st.session_state.teacher_id = generated_id
             st.session_state.consent_given = True
-            st.session_state.can_rate_system = check_has_submissions(
-                generated_id
-            )
+            st.session_state.can_rate_system = check_has_submissions(generated_id)
             st.rerun()

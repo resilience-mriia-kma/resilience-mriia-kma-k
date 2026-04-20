@@ -1,4 +1,5 @@
 """Database connection and persistence functions for the resilience assessment app."""
+
 import os
 
 import psycopg2
@@ -14,7 +15,7 @@ def connect_to_db():
             host=os.getenv("DB_HOST"),
             database=os.getenv("DB_NAME"),
             user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD")
+            password=os.getenv("DB_PASSWORD"),
         )
         # реєструємо тип даних 'vector' для нашого RAG
         register_vector(conn)
@@ -34,8 +35,7 @@ def check_has_submissions(teacher_id: str) -> bool:
     try:
         cur = conn.cursor()
         cur.execute(
-            "SELECT 1 FROM submissions WHERE teacher_id = %s LIMIT 1",
-            (teacher_id,)
+            "SELECT 1 FROM submissions WHERE teacher_id = %s LIMIT 1", (teacher_id,)
         )
         result = cur.fetchone()
         cur.close()
@@ -85,7 +85,8 @@ def save_feedback(feedback) -> bool:
             )
         """)
         grades_str = ", ".join(feedback.grades) if feedback.grades else None
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO feedbacks (
                 teacher_id, submission_id, experience, grades, subject,
                 completed, students_count, ease_of_use,
@@ -105,28 +106,45 @@ def save_feedback(feedback) -> bool:
                 %s, %s, %s, %s, %s, %s, %s,
                 %s, %s, %s, %s, %s, %s, %s, %s
             )
-        """, (
-            feedback.teacher_id, feedback.submission_id,
-            feedback.experience, grades_str, feedback.subject,
-            feedback.completed, feedback.students_count,
-            feedback.ease_of_use,
-            feedback.acceptability_1, feedback.acceptability_2,
-            feedback.acceptability_3,
-            feedback.appropriateness_1, feedback.appropriateness_2,
-            feedback.appropriateness_3,
-            feedback.feasibility_1, feedback.feasibility_2,
-            feedback.feasibility_3,
-            feedback.usability_1, feedback.usability_2,
-            feedback.usability_3,
-            feedback.llm_1, feedback.llm_2,
-            feedback.llm_3, feedback.llm_4,
-            feedback.safety_1, feedback.safety_2,
-            feedback.safety_3,
-            feedback.intention_1, feedback.intention_2,
-            feedback.open_1, feedback.open_2,
-            feedback.open_3, feedback.open_4,
-            feedback.helped_understand, feedback.changes_made,
-        ))
+        """,
+            (
+                feedback.teacher_id,
+                feedback.submission_id,
+                feedback.experience,
+                grades_str,
+                feedback.subject,
+                feedback.completed,
+                feedback.students_count,
+                feedback.ease_of_use,
+                feedback.acceptability_1,
+                feedback.acceptability_2,
+                feedback.acceptability_3,
+                feedback.appropriateness_1,
+                feedback.appropriateness_2,
+                feedback.appropriateness_3,
+                feedback.feasibility_1,
+                feedback.feasibility_2,
+                feedback.feasibility_3,
+                feedback.usability_1,
+                feedback.usability_2,
+                feedback.usability_3,
+                feedback.llm_1,
+                feedback.llm_2,
+                feedback.llm_3,
+                feedback.llm_4,
+                feedback.safety_1,
+                feedback.safety_2,
+                feedback.safety_3,
+                feedback.intention_1,
+                feedback.intention_2,
+                feedback.open_1,
+                feedback.open_2,
+                feedback.open_3,
+                feedback.open_4,
+                feedback.helped_understand,
+                feedback.changes_made,
+            ),
+        )
         conn.commit()
         cur.close()
         conn.close()
@@ -137,35 +155,59 @@ def save_feedback(feedback) -> bool:
         conn.close()
         return False
 
+
 import json
 
-def save_llm_generation(submission_id: str, teacher_id: str, form_data: dict, llm_response: str) -> bool:
+
+def save_llm_generation(
+    submission_id: str, teacher_id: str, form_data: dict, llm_response: str
+) -> bool:
     """Зберігає сесію генерації. Гарантує наявність ID."""
     if not submission_id:
         import uuid
+
         submission_id = str(uuid.uuid4())
 
     conn = connect_to_db()
-    if not conn: return False
+    if not conn:
+        return False
     try:
         cur = conn.cursor()
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO submissions (id, teacher_id, form_data_json, llm_response)
             VALUES (%s, %s, %s, %s)
             ON CONFLICT (id) DO NOTHING
-        """, (submission_id, teacher_id, json.dumps(form_data, ensure_ascii=False), llm_response))
+        """,
+            (
+                submission_id,
+                teacher_id,
+                json.dumps(form_data, ensure_ascii=False),
+                llm_response,
+            ),
+        )
         conn.commit()
         return True
     except Exception as e:
         print(f"Помилка збереження генерації: {e}")
         return False
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()
 
-def save_learning_memory(submission_id: str, profile_text: str, vector: list, response_text: str, avg_score: float, critique: str) -> bool:
+
+def save_learning_memory(
+    submission_id: str,
+    profile_text: str,
+    vector: list,
+    response_text: str,
+    avg_score: float,
+    critique: str,
+) -> bool:
     """Saves the interaction, score, and critique for future Few-Shot RAG."""
     conn = connect_to_db()
-    if not conn: return False
+    if not conn:
+        return False
     try:
         cur = conn.cursor()
         cur.execute("""
@@ -179,11 +221,15 @@ def save_learning_memory(submission_id: str, profile_text: str, vector: list, re
                 teacher_critique TEXT
             )
         """)
-        cur.execute("""
+        cur.execute(
+            """
             INSERT INTO ai_learning_memory (submission_id, student_profile_text, embedding, llm_response, avg_score, teacher_critique)
             VALUES (%s, %s, %s, %s, %s, %s)
-        """, (submission_id, profile_text, vector, response_text, avg_score, critique))
+        """,
+            (submission_id, profile_text, vector, response_text, avg_score, critique),
+        )
         conn.commit()
         return True
     finally:
-        if conn: conn.close()
+        if conn:
+            conn.close()

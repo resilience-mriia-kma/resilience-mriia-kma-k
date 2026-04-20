@@ -1,4 +1,5 @@
 """Custom CSS styles and UI helper components for the purple-themed Streamlit app."""
+
 import streamlit as st
 
 
@@ -9,7 +10,9 @@ def render_stepper(stepper_labels, current_step, completed_steps):
         if idx in completed_steps:
             stepper_html += f"<div class='step-completed'>{step_label}</div>"
         elif idx == current_step:
-            stepper_html += f"<div class='step-current'><strong>{step_label}</strong></div>"
+            stepper_html += (
+                f"<div class='step-current'><strong>{step_label}</strong></div>"
+            )
         else:
             stepper_html += f"<div class='step-locked'>{step_label}</div>"
     stepper_html += "</div>"
@@ -21,14 +24,15 @@ def scroll_to_top():
     st.markdown('<div id="top"></div>', unsafe_allow_html=True)
     st.markdown(
         '<script>window.parent.document.querySelector("section.main").scrollTo(0,0);</script>',
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
 
 def apply_custom_styles():
     """Apply custom CSS styles with purple theme to the Streamlit app."""
-    
-    st.markdown("""
+
+    st.markdown(
+        """
     <style>
         /* Purple Theme Colors */
         :root {
@@ -200,5 +204,6 @@ def apply_custom_styles():
             padding-top: 1.5rem !important;
         }
     </style>
-    """, unsafe_allow_html=True)
-    
+    """,
+        unsafe_allow_html=True,
+    )
