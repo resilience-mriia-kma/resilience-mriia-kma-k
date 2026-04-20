@@ -1,31 +1,37 @@
 """Results page showing AI recommendations after student evaluation."""
 import streamlit as st
-
-from src.styles import scroll_to_top
-
+from src.database import save_llm_generation
+from rag_agent import ResilienceAgent
 
 def render_results_page():
-    """Display recommendations page."""
-    scroll_to_top()
+     """Display recommendations page."""
+    st.title("Рекомендації для вчителя")
 
-    student_id = (
-        st.session_state.form_data.get("s_id", "")
-        if "form_data" in st.session_state
-        else ""
-    )
+    if "current_advice" not in st.session_state:
+        agent = ResilienceAgent()
 
-    st.title(f"{student_id}: рекомендації")
+        with st.spinner("Аналізуємо профіль та формуємо рекомендації..."):
+            form_data = st.session_state.form_data
+            advice_text = agent.generate_advice(form_data, comments_summary=[])
 
-    st.markdown("""
-    Дякуємо за завершення оцінювання!
+            save_success = save_llm_generation(
+                submission_id=st.session_state.submission_id,
+                teacher_id=st.session_state.teacher_id,
+                form_data=form_data,
+                llm_response=advice_text
+            )
 
-    У повній версії системи тут з'являться персоналізовані рекомендації
-    на основі штучного інтелекту.
-    """)
+            if not save_success:
+                st.error("Помилка збереження даних, але ви можете переглянути рекомендації.")
+
+            st.session_state.current_advice = advice_text
+
+    st.markdown(st.session_state.current_advice)
 
     st.divider()
 
-    if st.session_state.get("can_rate_system", False):
-        if st.button("Оцінити систему", type="primary"):
-            st.session_state.show_feedback = True
-            st.rerun()
+    if st.button("Завершити та оцінити якість", type="primary"):
+        st.session_state.show_feedback = True
+        st.rerun()
+
+    st.info(f"📋 **Ідентифікатор сесії (Обов'язково зберегти!) :** `{st.session_state.submission_id}`")
