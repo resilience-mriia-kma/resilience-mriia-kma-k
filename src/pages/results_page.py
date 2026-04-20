@@ -1,6 +1,7 @@
 """Results page showing AI recommendations after student evaluation."""
 
 import uuid
+
 import streamlit as st
 
 from rag_agent import ResilienceAgent
