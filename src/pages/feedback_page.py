@@ -7,12 +7,77 @@ from src.database import save_feedback
 from src.styles import scroll_to_top
 from src.utils import reset_evaluation_state
 
+from openai import OpenAI
+from src.database import connect_to_db, save_learning_memory
+from src.utils import build_semantic_student_profile
+
+def process_feedback_for_learning(feedback_data: FeedbackSubmission):
+    """AI Hook: Embeds the profile and updates the AI memory."""
+    llm_scores = [feedback_data.llm_1, feedback_data.llm_2, feedback_data.llm_3, feedback_data.llm_4]
+    valid_scores = [s for s in llm_scores if s is not None]
+    if not valid_scores:
+        return
+    avg_score = sum(valid_scores) / len(valid_scores)
+
+    critiques = []
+    if feedback_data.open_1: critiques.append(f"Корисне: {feedback_data.open_1}")
+    if feedback_data.open_4: critiques.append(f"Зміни: {feedback_data.open_4}")
+    if feedback_data.changes_made: critiques.append(f"Застосовані кроки: {feedback_data.changes_made}")
+    combined_critique = " | ".join(critiques) if critiques else "Коментарів немає"
+
+    client = OpenAI()
+    conn = connect_to_db()
+    if not conn: return
+
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT form_data_json, llm_response FROM submissions WHERE id = %s",
+            (feedback_data.submission_id,)
+        )
+        result = cur.fetchone()
+
+        if result:
+            import json
+            form_data = json.loads(result[0])
+            llm_response = result[1]
+
+            semantic_profile = build_semantic_student_profile(form_data)
+
+            emb_response = client.embeddings.create(
+                input=semantic_profile,
+                model="text-embedding-3-small"
+            )
+
+            save_learning_memory(
+                submission_id=feedback_data.submission_id,
+                profile_text=semantic_profile,
+                vector=emb_response.data[0].embedding,
+                response_text=llm_response,
+                avg_score=avg_score,
+                critique=combined_critique
+            )
+    except Exception as e:
+        print(f"Помилка збереження в пам'ять ШІ: {e}")
+    finally:
+        if conn: conn.close()
 
 def render_feedback_form():
     """Render the comprehensive 11-block teacher feedback form."""
     scroll_to_top()
-    
     st.title("Форма зворотнього зв'язку")
+
+    current_sub_id = st.session_state.get("submission_id", "")
+
+    st.subheader("Прив'язка до результатів")
+
+    manual_sub_id = st.text_input(
+        "Введіть Ідентифікатор сесії (ID):",
+        value=current_sub_id,
+        placeholder="Наприклад: 550e8400-e29b-41d4-a716-446655440000",
+        help="Цей ID ви бачили на сторінці з рекомендаціями. Він потрібен для зв'язку відгуку з порадами ШІ."
+    )
+
     st.markdown("### Оцінка використання ШІ-агента \"Помічник педагога\"")
     
     with st.form("feedback_form"):
@@ -304,11 +369,10 @@ def render_feedback_form():
                 type="primary",
                 use_container_width=True
             )
-        
         if submit_btn:
             form_data = {
                 "teacher_id": st.session_state.get("teacher_id"),
-                "submission_id": st.session_state.get("submission_id"),
+                "submission_id": manual_sub_id,
                 "experience": experience,
                 "grades": grades,
                 "subject": subject or None,
@@ -345,12 +409,17 @@ def render_feedback_form():
             }
             try:
                 submission = FeedbackSubmission(**form_data)
-                saved = save_feedback(submission)
+                saved = save_feedback(submission)  # Your original save
+
                 if saved:
                     st.success(
                         "Дякуємо за ваш відгук! "
                         "Цей внесок суттєво допоможе вдосконалити систему."
                     )
+
+                    with st.spinner("Оновлюємо базу знань штучного інтелекту..."):
+                        process_feedback_for_learning(submission)
+
                 else:
                     st.warning(
                         "Відгук не вдалося зберегти. "
