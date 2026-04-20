@@ -4,7 +4,6 @@ import os
 import uuid
 
 import streamlit as st
-
 from src.constants import QUESTIONS
 
 
@@ -186,7 +185,13 @@ def calculate_factor_scores(form_data: dict, factor_names: list) -> dict:
             int(a[0]) for a in answers 
             if a and not a.startswith("NA")
         ]
-
+        
+        if numeric_answers:
+            calculated_scores[factor] = round(sum(numeric_answers) / len(numeric_answers))
+        else:
+            calculated_scores[factor] = 0  # Default value if all NA
+    
+    return calculated_scores
 
 def build_semantic_student_profile(form_data: dict) -> str:
     """Translates raw 0-2 scores into a detailed text narrative for the LLM."""
@@ -222,10 +227,3 @@ def build_semantic_student_profile(form_data: dict) -> str:
         profile += "\n".join(strengths) + "\n\n"
 
     return profile
-        
-        if numeric_answers:
-            calculated_scores[factor] = round(sum(numeric_answers) / len(numeric_answers))
-        else:
-            calculated_scores[factor] = 0  # Default value if all NA
-    
-    return calculated_scores
