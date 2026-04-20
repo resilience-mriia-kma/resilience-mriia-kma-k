@@ -186,6 +186,42 @@ def calculate_factor_scores(form_data: dict, factor_names: list) -> dict:
             int(a[0]) for a in answers 
             if a and not a.startswith("NA")
         ]
+
+
+def build_semantic_student_profile(form_data: dict) -> str:
+    """Translates raw 0-2 scores into a detailed text narrative for the LLM."""
+
+    strengths = []  # Scores of 2
+    weaknesses = []  # Scores of 0
+
+    for factor, questions_list in QUESTIONS.items():
+        answers = form_data.get("answers", {}).get(factor, [])
+
+        for i, ans in enumerate(answers):
+            if not ans or ans.startswith("NA"):
+                continue
+
+            score = int(ans[0])
+            question_text = questions_list[i]
+
+            if score == 2:
+                strengths.append(f"- {question_text}")
+            elif score == 0:
+                weaknesses.append(f"- {question_text}")
+
+    profile = "Детальний профіль учня:\n\n"
+
+    if weaknesses:
+        profile += "🔴 ЗОНИ УВАГИ (Потребують термінової підтримки):\n"
+        profile += "\n".join(weaknesses) + "\n\n"
+    else:
+        profile += "🔴 ЗОНИ УВАГИ: Явних критичних проблем не виявлено.\n\n"
+
+    if strengths:
+        profile += "🟢 СИЛЬНІ СТОРОНИ (Ресурс для спирання):\n"
+        profile += "\n".join(strengths) + "\n\n"
+
+    return profile
         
         if numeric_answers:
             calculated_scores[factor] = round(sum(numeric_answers) / len(numeric_answers))
