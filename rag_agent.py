@@ -1,7 +1,8 @@
 import os
 from openai import OpenAI
 from src.database import connect_to_db
-from schemas import TeacherFormSubmission
+from src.utils import build_semantic_student_profile  # Import your new function
+
 
 class ResilienceAgent:
     def __init__(self):
@@ -10,115 +11,92 @@ class ResilienceAgent:
 
     def _get_system_prompt(self) -> str:
         return """
-        You are an expert AI assistant for school teachers.
-        Your goal: provide 3-5 practical recommendations for a teacher about a student.
-        Always respond in Ukrainian.
+        Ти — експертний помічник педагога. Твоя мета: надати 3-5 практичних рекомендацій для вчителя щодо учня.
+        Відповідай українською мовою.
 
-        SAFETY RULES:
-        1. NEVER make medical or psychological diagnoses.
-        2. NEVER use words like "depression", "trauma", "disorder".
-        3. You are a teacher support tool, not a psychotherapist.
-
-        TEXT ADAPTATION RULES:
-        Translate abstract scientific terms into simple classroom actions:
-        - "emotional regulation training" -> "ask the child to take 3 deep breaths"
-        - "family intervention" -> "send parents a short positive message about the student"
+        ПРАВИЛА БЕЗПЕКИ:
+        1. НІКОЛИ не став медичних або психологічних діагнозів.
+        2. НІКОЛИ не використовуй слова "депресія", "травма", "розлад".
+        3. Ти інструмент підтримки вчителя, а не психотерапевт.
         """
 
-    def _retrieve_knowledge(self, scores: dict) -> str:
-        """Витягує релевантні поради з векторної бази pgvector"""
-        # Формуємо текстовий запит на основі низьких балів
-        low_factors = [factor for factor, score in scores.items() if score == 0]
-        
-        if not low_factors:
-            return "Специфічних проблем не виявлено. Використовуй загальні рекомендації для підтримки."
+    def _retrieve_knowledge(self, semantic_profile: str) -> str:
+        pass
 
-        query = f"поради для підтримки учня з низькими балами: {', '.join(low_factors)}"
-        
+    def _retrieve_contrastive_examples(self, profile_text: str) -> dict:
+        """Витягує і найкращі, і найгірші приклади для подібних профілів"""
         try:
-            # Отримуємо embedding для запиту
             response = self.client.embeddings.create(
-                input=query,
+                input=profile_text,
                 model="text-embedding-3-small"
             )
             query_vector = response.data[0].embedding
-            
-            if self.db is None:
-                return "База даних pgvector наразі недоступна. Використовуй свої базові знання про підтримку дітей."
-
-            # Шукаємо схожі записи в pgvector
             cursor = self.db.cursor()
+
             cursor.execute("""
-                SELECT content FROM knowledge_base
-                ORDER BY embedding <-> %s::vector
-                LIMIT 5
+                SELECT llm_response FROM ai_learning_memory 
+                WHERE avg_score >= 4.0 ORDER BY embedding <-> %s::vector LIMIT 1
             """, (query_vector,))
-            
-            results = cursor.fetchall()
-            return "\n".join([row[0] for row in results])
+            positive = cursor.fetchone()
+
+            cursor.execute("""
+                SELECT llm_response, teacher_critique FROM ai_learning_memory 
+                WHERE avg_score <= 2.5 ORDER BY embedding <-> %s::vector LIMIT 1
+            """, (query_vector,))
+            negative = cursor.fetchone()
+
+            return {
+                "good": positive[0] if positive else None,
+                "bad_response": negative[0] if negative else None,
+                "bad_critique": negative[1] if negative else None
+            }
         except Exception as e:
-            print(f"Помилка пошуку в БД: {e}")
-            return "Не вдалося отримати дані з бази знань через технічну помилку."
+            print(f"Помилка пошуку contrastive_examples: {e}")
+            return {"good": None, "bad_response": None, "bad_critique": None}
 
-    def generate_advice(self, submission: TeacherFormSubmission) -> str:
-        scores = {
-            "Підтримка сім'ї": submission.family_support_score,
-            "Оптимізм": submission.optimism_score,
-            "Цілеспрямованість": submission.coping_score,
-            "Соціальні зв'язки": submission.social_connections_score,
-            "Здоров'я": submission.health_score,
-        }
-        
-        comments_summary = []
-        if submission.family_support_comments:
-            non_empty = [c for c in submission.family_support_comments if c.strip()]
-            if non_empty:
-                comments_summary.append(f"Підтримка сім'ї: {'; '.join(non_empty)}")
-        
-        if submission.optimism_comments:
-            non_empty = [c for c in submission.optimism_comments if c.strip()]
-            if non_empty:
-                comments_summary.append(f"Оптимізм: {'; '.join(non_empty)}")
-        
-        if submission.coping_comments:
-            non_empty = [c for c in submission.coping_comments if c.strip()]
-            if non_empty:
-                comments_summary.append(f"Цілеспрямованість: {'; '.join(non_empty)}")
-        
-        if submission.social_connections_comments:
-            non_empty = [c for c in submission.social_connections_comments if c.strip()]
-            if non_empty:
-                comments_summary.append(f"Соціальні зв'язки: {'; '.join(non_empty)}")
-        
-        if submission.health_comments:
-            non_empty = [c for c in submission.health_comments if c.strip()]
-            if non_empty:
-                comments_summary.append(f"Здоров'я: {'; '.join(non_empty)}")
-        
-        retrieved_knowledge = self._retrieve_knowledge(scores)
-        
+    def generate_advice(self, form_data: dict, comments_summary: list) -> str:
+
+        semantic_profile = build_semantic_student_profile(form_data)
+
+        retrieved_knowledge = self._retrieve_knowledge(semantic_profile)
+        examples = self._retrieve_contrastive_examples(semantic_profile)
+
+        contrastive_prompt = ""
+        if examples["good"]:
+            contrastive_prompt += f"\nПРИКЛАД ВДАЛОЇ ВІДПОВІДІ (наслідуй цей стиль та формат):\n{examples['good']}\n"
+
+        if examples["bad_response"]:
+            contrastive_prompt += f"""
+            ПРИКЛАД НЕВДАЛОЇ ВІДПОВІДІ:
+            {examples["bad_response"]}
+
+            КОМЕНТАР ВЧИТЕЛЯ ЩОДО ЦІЄЇ ПОМИЛКИ: 
+            "{examples["bad_critique"]}"
+
+            ЗАВДАННЯ: Враховуй цей коментар вчителя. Не роби помилок, описаних у невдалому прикладі.
+            """
+
         user_prompt = f"""
-        Оцінки учня (0=низький, 1=середній, 2=високий):
-        {scores}
+        Ось спостереження за учнем:
 
-        Конкретні спостереження вчителя по кожному питанню:
+        {semantic_profile}
+
+        Коментарі вчителя:
         {chr(10).join(comments_summary) if comments_summary else 'не вказано'}
 
-        НАУКОВІ ДАНІ З БАЗИ ЗНАНЬ (ВИКОРИСТОВУЙ ТІЛЬКИ ЦЕ):
+        НАУКОВІ ДАНІ З БАЗИ ЗНАНЬ:
         {retrieved_knowledge}
 
-        ВАЖЛИВО: Корелюй кожен бал з конкретними коментарями вчителя для більш нюансованого аналізу.
-        Напиши коротку інструкцію для вчителя маркованими списками.
+        {contrastive_prompt}
+
+        Згенеруй практичні рекомендації. Спирайся на "Сильні сторони" учня, щоб вирішити проблеми у "Зонах уваги".
         """
-        
-        try:
-            response = self.client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": self._get_system_prompt()},
-                    {"role": "user", "content": user_prompt}
-                ]
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            return f"Сталася помилка при зверненні до OpenAI: {e}"
+
+        response = self.client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": self._get_system_prompt()},
+                {"role": "user", "content": user_prompt}
+            ]
+        )
+        return response.choices[0].message.content
