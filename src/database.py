@@ -136,3 +136,54 @@ def save_feedback(feedback) -> bool:
         conn.rollback()
         conn.close()
         return False
+
+import json
+
+def save_llm_generation(submission_id: str, teacher_id: str, form_data: dict, llm_response: str) -> bool:
+    """Зберігає сесію генерації. Гарантує наявність ID."""
+    if not submission_id:
+        import uuid
+        submission_id = str(uuid.uuid4())
+
+    conn = connect_to_db()
+    if not conn: return False
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO submissions (id, teacher_id, form_data_json, llm_response)
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT (id) DO NOTHING
+        """, (submission_id, teacher_id, json.dumps(form_data, ensure_ascii=False), llm_response))
+        conn.commit()
+        return True
+    except Exception as e:
+        print(f"Помилка збереження генерації: {e}")
+        return False
+    finally:
+        if conn: conn.close()
+
+def save_learning_memory(submission_id: str, profile_text: str, vector: list, response_text: str, avg_score: float, critique: str) -> bool:
+    """Saves the interaction, score, and critique for future Few-Shot RAG."""
+    conn = connect_to_db()
+    if not conn: return False
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS ai_learning_memory (
+                id SERIAL PRIMARY KEY,
+                submission_id VARCHAR(50) REFERENCES submissions(id),
+                student_profile_text TEXT,
+                embedding vector(1536),
+                llm_response TEXT,
+                avg_score FLOAT,
+                teacher_critique TEXT
+            )
+        """)
+        cur.execute("""
+            INSERT INTO ai_learning_memory (submission_id, student_profile_text, embedding, llm_response, avg_score, teacher_critique)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (submission_id, profile_text, vector, response_text, avg_score, critique))
+        conn.commit()
+        return True
+    finally:
+        if conn: conn.close()
