@@ -1,81 +1,70 @@
 """Database connection and persistence functions for the resilience assessment app."""
 
+import json
 import os
+import uuid
 
 import psycopg2
 from pgvector.psycopg2 import register_vector
 
 
-def connect_to_db():
-    """Open a new psycopg2 connection using environment variables.
+def _raw_connect():
+    """Open a psycopg2 connection WITHOUT registering the pgvector type.
 
-    Expects the following to be set in the environment:
-        POSTGRES_HOST       (e.g. "db" inside docker-compose, "localhost" otherwise)
-        POSTGRES_PORT       (defaults to 5432 if unset)
-        POSTGRES_DB
-        POSTGRES_USER
-        POSTGRES_PASSWORD
+    Used by init_db() during bootstrap, when the `vector` extension may not
+    yet exist in the target database. All other callers should use
+    connect_to_db() instead.
     """
     return psycopg2.connect(
-        host=os.environ["POSTGRES_HOST"],
-        port=os.environ.get("POSTGRES_PORT", "5432"),
-        dbname=os.environ["POSTGRES_DB"],
-        user=os.environ["POSTGRES_USER"],
-        password=os.environ["POSTGRES_PASSWORD"],
+        host=os.getenv("DB_HOST"),
+        database=os.getenv("DB_NAME"),
+        user=os.getenv("DB_USER"),
+        password=os.getenv("DB_PASSWORD"),
     )
 
 
-'''
 def connect_to_db():
     """
-    Підключення до бази даних pgvector на сервері
+    Підключення до бази даних pgvector на сервері.
     """
     try:
-        conn = psycopg2.connect(
-            host=os.getenv("DB_HOST"),
-            database=os.getenv("DB_NAME"),
-            user=os.getenv("DB_USER"),
-            password=os.getenv("DB_PASSWORD"),
-        )
+        conn = _raw_connect()
         # реєструємо тип даних 'vector' для нашого RAG
         register_vector(conn)
         return conn
     except Exception as e:  # pylint: disable=broad-except
         print(f"Помилка підключення: {e}")
         return None
-'''
 
 
-def check_has_submissions(teacher_id: str) -> bool:
-    """Check whether a teacher has at least one saved student submission."""
-    if not teacher_id:
-        return False
-    conn = connect_to_db()
-    if not conn:
-        return False
+def init_db() -> None:
+    """Create the pgvector extension and all required tables.
+
+    Idempotent: safe to call on every app startup. Must be called before
+    any save_* function so that the schema exists. Order matters —
+    `submissions` is created before `ai_learning_memory` because of the
+    foreign key dependency.
+    """
+    conn = _raw_connect()
     try:
         cur = conn.cursor()
-        cur.execute(
-            "SELECT 1 FROM submissions WHERE teacher_id = %s LIMIT 1", (teacher_id,)
-        )
-        result = cur.fetchone()
-        cur.close()
-        conn.close()
-        return result is not None
-    except Exception as e:  # pylint: disable=broad-except
-        print(f"Помилка перевірки submissions: {e}")
-        conn.close()
-        return False
 
+        # Enable pgvector — required for the vector(1536) column type
+        # and the <-> similarity operator used in rag_agent.py.
+        cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-def save_feedback(feedback) -> bool:
-    """Save a FeedbackSubmission to the feedbacks table, creating it if needed."""
-    conn = connect_to_db()
-    if not conn:
-        return False
+        # submissions: one row per LLM generation session.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS submissions (
+                id VARCHAR(50) PRIMARY KEY,
+                teacher_id VARCHAR(20),
+                form_data_json TEXT,
+                llm_response TEXT,
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
 
-    try:
-        cur = conn.cursor()
+        # feedbacks: 11-block teacher feedback form.
         cur.execute("""
             CREATE TABLE IF NOT EXISTS feedbacks (
                 id SERIAL PRIMARY KEY,
@@ -105,6 +94,60 @@ def save_feedback(feedback) -> bool:
                 changes_made TEXT
             )
         """)
+
+        # ai_learning_memory: RAG store for few-shot retrieval.
+        # FK to submissions(id) — that's why submissions is created first.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS ai_learning_memory (
+                id SERIAL PRIMARY KEY,
+                submission_id VARCHAR(50) REFERENCES submissions(id),
+                student_profile_text TEXT,
+                embedding vector(1536),
+                llm_response TEXT,
+                avg_score FLOAT,
+                teacher_critique TEXT
+            )
+        """)
+
+        conn.commit()
+        cur.close()
+    finally:
+        conn.close()
+
+
+def check_has_submissions(teacher_id: str) -> bool:
+    """Check whether a teacher has at least one saved student submission."""
+    if not teacher_id:
+        return False
+    conn = connect_to_db()
+    if not conn:
+        return False
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT 1 FROM submissions WHERE teacher_id = %s LIMIT 1", (teacher_id,)
+        )
+        result = cur.fetchone()
+        cur.close()
+        conn.close()
+        return result is not None
+    except Exception as e:  # pylint: disable=broad-except
+        print(f"Помилка перевірки submissions: {e}")
+        conn.close()
+        return False
+
+
+def save_feedback(feedback) -> bool:
+    """Save a FeedbackSubmission to the feedbacks table.
+
+    Assumes init_db() has already been called at app startup.
+    """
+    conn = connect_to_db()
+    if not conn:
+        return False
+
+    try:
+        cur = conn.cursor()
         grades_str = ", ".join(feedback.grades) if feedback.grades else None
         cur.execute(
             """
@@ -177,16 +220,11 @@ def save_feedback(feedback) -> bool:
         return False
 
 
-import json
-
-
 def save_llm_generation(
     submission_id: str, teacher_id: str, form_data: dict, llm_response: str
 ) -> bool:
     """Зберігає сесію генерації. Гарантує наявність ID."""
     if not submission_id:
-        import uuid
-
         submission_id = str(uuid.uuid4())
 
     conn = connect_to_db()
@@ -209,7 +247,7 @@ def save_llm_generation(
         )
         conn.commit()
         return True
-    except Exception as e:
+    except Exception as e:  # pylint: disable=broad-except
         print(f"Помилка збереження генерації: {e}")
         return False
     finally:
@@ -225,26 +263,21 @@ def save_learning_memory(
     avg_score: float,
     critique: str,
 ) -> bool:
-    """Saves the interaction, score, and critique for future Few-Shot RAG."""
+    """Saves the interaction, score, and critique for future Few-Shot RAG.
+
+    Assumes init_db() has already been called at app startup.
+    """
     conn = connect_to_db()
     if not conn:
         return False
     try:
         cur = conn.cursor()
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS ai_learning_memory (
-                id SERIAL PRIMARY KEY,
-                submission_id VARCHAR(50) REFERENCES submissions(id),
-                student_profile_text TEXT,
-                embedding vector(1536),
-                llm_response TEXT,
-                avg_score FLOAT,
-                teacher_critique TEXT
-            )
-        """)
         cur.execute(
             """
-            INSERT INTO ai_learning_memory (submission_id, student_profile_text, embedding, llm_response, avg_score, teacher_critique)
+            INSERT INTO ai_learning_memory (
+                submission_id, student_profile_text, embedding,
+                llm_response, avg_score, teacher_critique
+            )
             VALUES (%s, %s, %s, %s, %s, %s)
         """,
             (submission_id, profile_text, vector, response_text, avg_score, critique),

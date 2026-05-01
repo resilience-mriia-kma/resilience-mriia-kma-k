@@ -8,15 +8,16 @@ services:
     env_file:
       - .env
     environment:
-      - POSTGRES_HOST=db
-      - POSTGRES_PORT=5432
-      - POSTGRES_DB=${POSTGRES_DB:-n8n_db}
-      - POSTGRES_USER=${POSTGRES_USER:-n8n}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-n8n_pass}
+      # database.py reads DB_* — map them from the POSTGRES_* values
+      # used by the db service so credentials stay in one place.
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB:-n8n_db}
+      - DB_USER=${POSTGRES_USER:-n8n}
+      - DB_PASSWORD=${POSTGRES_PASSWORD:-n8n_pass}
     depends_on:
       db:
         condition: service_healthy
-
   db:
     image: ankane/pgvector:latest
     restart: always
