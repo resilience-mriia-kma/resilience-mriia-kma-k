@@ -5,7 +5,24 @@ import os
 import psycopg2
 from pgvector.psycopg2 import register_vector
 
-
+def connect_to_db():
+    """Open a new psycopg2 connection using environment variables.
+ 
+    Expects the following to be set in the environment:
+        POSTGRES_HOST       (e.g. "db" inside docker-compose, "localhost" otherwise)
+        POSTGRES_PORT       (defaults to 5432 if unset)
+        POSTGRES_DB
+        POSTGRES_USER
+        POSTGRES_PASSWORD
+    """
+    return psycopg2.connect(
+        host=os.environ["POSTGRES_HOST"],
+        port=os.environ.get("POSTGRES_PORT", "5432"),
+        dbname=os.environ["POSTGRES_DB"],
+        user=os.environ["POSTGRES_USER"],
+        password=os.environ["POSTGRES_PASSWORD"],
+    )
+'''
 def connect_to_db():
     """
     Підключення до бази даних pgvector на сервері
@@ -23,7 +40,7 @@ def connect_to_db():
     except Exception as e:  # pylint: disable=broad-except
         print(f"Помилка підключення: {e}")
         return None
-
+'''
 
 def check_has_submissions(teacher_id: str) -> bool:
     """Check whether a teacher has at least one saved student submission."""
