@@ -30,6 +30,7 @@ class ResilienceAgent:
         - чи метод викликався
         - скільки чанків повернулося
         - distance найближчих джерел (менше = ближче)
+        - повний текст кожного отриманого чанку
         """
         if not semantic_profile:
             print("[RAG] _retrieve_knowledge: empty profile, skipping")
@@ -42,9 +43,6 @@ class ResilienceAgent:
             query_vector = response.data[0].embedding
 
             cursor = self.db.cursor()
-            # Selecting the distance alongside the row lets us log how
-            # close the nearest match actually is — useful for spotting
-            # cases where retrieval "works" but the results are junk.
             cursor.execute(
                 """
                 SELECT content, source_file, embedding <-> %s::vector AS distance
@@ -65,8 +63,13 @@ class ResilienceAgent:
                 f"[RAG] _retrieve_knowledge: {len(results)} chunks, "
                 f"top distance={results[0][2]:.4f}"
             )
-            for _, source, distance in results:
-                print(f"[RAG]   - {source} (distance={distance:.4f})")
+            for i, (content, source, distance) in enumerate(results, start=1):
+                print(f"[RAG] ─── #{i}  source={source}  distance={distance:.4f} ───")
+                # Prefix each line of content with [RAG] so `grep RAG` still
+                # surfaces the chunk text alongside the metadata lines.
+                for line in content.splitlines():
+                    print(f"[RAG] {line}")
+                print(f"[RAG] ─── end #{i} ───")
 
             chunks = [f"[Джерело: {source}]\n{content}" for content, source, _ in results]
             return "\n\n---\n\n".join(chunks)
