@@ -109,6 +109,20 @@ def init_db() -> None:
             )
         """)
 
+        # knowledge_base: source documents (methodology, articles, etc.)
+        # chunked and embedded for retrieval-augmented generation.
+        # 1536 dims = text-embedding-3-small.
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS knowledge_base (
+                id SERIAL PRIMARY KEY,
+                source_file VARCHAR(255),
+                chunk_index INTEGER,
+                content TEXT,
+                embedding vector(1536),
+                created_at TIMESTAMP DEFAULT NOW()
+            )
+        """)
+
         conn.commit()
         cur.close()
     finally:

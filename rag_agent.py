@@ -20,8 +20,43 @@ class ResilienceAgent:
         3. Ти інструмент підтримки вчителя, а не психотерапевт.
         """
 
-    def _retrieve_knowledge(self, semantic_profile: str) -> str:
-        pass
+    def _retrieve_knowledge(self, semantic_profile: str, limit: int = 3) -> str:
+        """Семантичний пошук релевантних фрагментів у knowledge_base.
+
+        Повертає пустий рядок, якщо база порожня або сталася помилка —
+        це дозволяє generate_advice() повністю пропустити блок промпту.
+        """
+        if not semantic_profile:
+            return ""
+        try:
+            response = self.client.embeddings.create(
+                input=semantic_profile,
+                model="text-embedding-3-small",
+            )
+            query_vector = response.data[0].embedding
+
+            cursor = self.db.cursor()
+            cursor.execute(
+                """
+                SELECT content, source_file
+                FROM knowledge_base
+                ORDER BY embedding <-> %s::vector
+                LIMIT %s
+                """,
+                (query_vector, limit),
+            )
+            results = cursor.fetchall()
+            cursor.close()
+
+            if not results:
+                return ""
+
+            chunks = [f"[Джерело: {source}]\n{content}" for content, source in results]
+            return "\n\n---\n\n".join(chunks)
+
+        except Exception as e:  # pylint: disable=broad-except
+            print(f"Помилка пошуку в базі знань: {e}")
+            return ""
 
     def _retrieve_contrastive_examples(self, profile_text: str) -> dict:
         """Витягує і найкращі, і найгірші приклади для подібних профілів"""
@@ -61,6 +96,14 @@ class ResilienceAgent:
         retrieved_knowledge = self._retrieve_knowledge(semantic_profile)
         examples = self._retrieve_contrastive_examples(semantic_profile)
 
+        # Knowledge base block — only included if we actually retrieved something.
+        knowledge_prompt = ""
+        if retrieved_knowledge:
+            knowledge_prompt = f"""
+            НАУКОВІ ДАНІ З БАЗИ ЗНАНЬ:
+            {retrieved_knowledge}
+            """
+
         contrastive_prompt = ""
         if examples["good"]:
             contrastive_prompt += f"\nПРИКЛАД ВДАЛОЇ ВІДПОВІДІ (наслідуй цей стиль та формат):\n{examples['good']}\n"
@@ -84,8 +127,7 @@ class ResilienceAgent:
         Коментарі вчителя:
         {chr(10).join(comments_summary) if comments_summary else 'не вказано'}
 
-        НАУКОВІ ДАНІ З БАЗИ ЗНАНЬ:
-        {retrieved_knowledge}
+        {knowledge_prompt}
 
         {contrastive_prompt}
 
