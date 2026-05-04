@@ -15,6 +15,10 @@ services:
       - DB_NAME=${POSTGRES_DB:-n8n_db}
       - DB_USER=${POSTGRES_USER:-n8n}
       - DB_PASSWORD=${POSTGRES_PASSWORD:-n8n_pass}
+    volumes:
+      # Mount kb/ read-only so the indexer (scripts/index_kb.py) can
+      # read documents from inside the container.
+      - ./kb:/app/kb:ro
     depends_on:
       db:
         condition: service_healthy
